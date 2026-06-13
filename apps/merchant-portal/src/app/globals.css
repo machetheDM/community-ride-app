@@ -1,0 +1,13 @@
+@import "tailwindcss";
+
+:root {
+  --background: #0f172a;
+  --foreground: #f8fafc;
+  --card: #1e293b;
+  --primary: #f59e0b;
+  --border: #334155;
+}
+
+* { box-sizing: border-box; padding: 0; margin: 0; }
+html, body { background-color: var(--background); color: var(--foreground); font-family: system-ui, sans-serif; }
+a { color: inherit; text-decoration: none; }

@@ -1,0 +1,51 @@
+{
+  "expo": {
+    "name": "Community Ride — Driver",
+    "slug": "community-ride-driver",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "dark",
+    "scheme": "community-ride-driver",
+    "splash": {
+      "image": "./assets/splash.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#0f172a"
+    },
+    "assetBundlePatterns": ["**/*"],
+    "ios": {
+      "supportsTablet": false,
+      "bundleIdentifier": "com.communityride.driver",
+      "infoPlist": {
+        "NSLocationWhenInUseUsageDescription": "We need your location to show you nearby ride requests.",
+        "NSLocationAlwaysUsageDescription": "We track your location while you are on a trip."
+      }
+    },
+    "android": {
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#0f172a"
+      },
+      "package": "com.communityride.driver",
+      "permissions": [
+        "ACCESS_FINE_LOCATION",
+        "ACCESS_COARSE_LOCATION",
+        "ACCESS_BACKGROUND_LOCATION"
+      ]
+    },
+    "plugins": [
+      "expo-router",
+      "expo-font",
+      [
+        "expo-location",
+        {
+          "locationAlwaysAndWhenInUsePermission": "Allow Community Ride Driver to use your location.",
+          "isAndroidBackgroundLocationEnabled": true
+        }
+      ]
+    ],
+    "experiments": {
+      "typedRoutes": true
+    }
+  }
+}
