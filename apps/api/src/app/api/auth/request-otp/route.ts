@@ -1,40 +1,30 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextRequest } from "next/server";
+import { randomInt } from "crypto";
 import { prisma } from "@/lib/prisma";
+import { parseBody, otpRequestSchema } from "@/lib/validate";
+import { ok } from "@/lib/response";
+import { withErrorHandler } from "@/lib/handler";
+import { logger } from "@/lib/logger";
 
+// Math.random() is not cryptographically secure and its output is predictable
+// from prior draws; an OTP is an authentication secret, so it uses the CSPRNG.
 function generateOtp() {
-  return Math.floor(100000 + Math.random() * 900000).toString();
+  return randomInt(100_000, 1_000_000).toString();
 }
 
-function normalizePhone(phone: string) {
-  const digits = phone.replace(/\D/g, "");
-  if (digits.startsWith("0") && digits.length === 10) return "+27" + digits.slice(1);
-  if (digits.startsWith("27") && digits.length === 11) return "+" + digits;
-  if (digits.startsWith("27") && digits.length === 12) return "+" + digits;
-  return "+" + digits;
-}
+export const POST = withErrorHandler(async (req: NextRequest) => {
+  const { phone } = await parseBody(req, otpRequestSchema);
 
-export async function POST(req: NextRequest) {
-  try {
-    const { phone } = await req.json();
-    if (!phone) return NextResponse.json({ error: "Phone number required" }, { status: 400 });
+  const code = generateOtp();
+  const expiresAt = new Date(Date.now() + 10 * 60 * 1000);
 
-    const normalized = normalizePhone(phone);
-    if (normalized.length < 10)
-      return NextResponse.json({ error: "Invalid phone number" }, { status: 400 });
+  await prisma.otpCode.create({ data: { phone, code, expiresAt } });
 
-    const code = generateOtp();
-    const expiresAt = new Date(Date.now() + 10 * 60 * 1000);
+  logger.info(`OTP requested for ${phone.slice(0, 6)}***`);
 
-    await prisma.otpCode.create({ data: { phone: normalized, code, expiresAt } });
-
-    console.log(`[OTP] ${normalized} → ${code}`);
-
-    return NextResponse.json({
-      success: true,
-      message: "OTP sent",
-      ...(process.env.NODE_ENV === "development" ? { code } : {}),
-    });
-  } catch {
-    return NextResponse.json({ error: "Failed to send OTP" }, { status: 500 });
-  }
-}
+  return ok({
+    message: "OTP sent",
+    expiresIn: 600,
+    ...(process.env.NODE_ENV === "development" ? { code } : {}),
+  });
+});

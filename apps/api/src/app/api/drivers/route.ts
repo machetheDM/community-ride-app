@@ -1,7 +1,9 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextRequest } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { ok } from "@/lib/response";
+import { withErrorHandler } from "@/lib/handler";
 
-export async function GET(req: NextRequest) {
+export const GET = withErrorHandler(async (req: NextRequest) => {
   const { searchParams } = new URL(req.url);
   const isOnline = searchParams.get("isOnline");
   const isApproved = searchParams.get("isApproved");
@@ -21,5 +23,5 @@ export async function GET(req: NextRequest) {
     orderBy: { rating: "desc" },
   });
 
-  return NextResponse.json({ success: true, data: drivers });
-}
+  return ok(drivers);
+});

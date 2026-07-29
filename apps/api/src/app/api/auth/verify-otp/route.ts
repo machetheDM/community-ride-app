@@ -1,53 +1,35 @@
-import { NextRequest, NextResponse } from "next/server";
-import jwt from "jsonwebtoken";
+import { NextRequest } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { parseBody, otpVerifySchema } from "@/lib/validate";
+import { ok, unauthorized } from "@/lib/response";
+import { withErrorHandler } from "@/lib/handler";
+import { signAuthToken } from "@/lib/auth";
+import { logger } from "@/lib/logger";
 
-const JWT_SECRET = process.env.JWT_SECRET ?? "dev-secret-change-in-production";
+export const POST = withErrorHandler(async (req: NextRequest) => {
+  const { phone, code } = await parseBody(req, otpVerifySchema);
+  const now = new Date();
 
-function normalizePhone(phone: string) {
-  const digits = phone.replace(/\D/g, "");
-  if (digits.startsWith("0") && digits.length === 10) return "+27" + digits.slice(1);
-  if (digits.startsWith("27") && digits.length === 11) return "+" + digits;
-  if (digits.startsWith("27") && digits.length === 12) return "+" + digits;
-  return "+" + digits;
-}
+  const otp = await prisma.otpCode.findFirst({
+    where: { phone, code, used: false, expiresAt: { gt: now } },
+    orderBy: { createdAt: "desc" },
+  });
 
-export async function POST(req: NextRequest) {
-  try {
-    const { phone, code } = await req.json();
-    if (!phone || !code) return NextResponse.json({ error: "Phone and code required" }, { status: 400 });
+  if (!otp) return unauthorized("Invalid or expired OTP");
 
-    const normalized = normalizePhone(phone);
-    const now = new Date();
+  await prisma.otpCode.update({ where: { id: otp.id }, data: { used: true } });
 
-    const otp = await prisma.otpCode.findFirst({
-      where: { phone: normalized, code, used: false, expiresAt: { gt: now } },
-      orderBy: { createdAt: "desc" },
-    });
-
-    if (!otp) return NextResponse.json({ error: "Invalid or expired OTP" }, { status: 401 });
-
-    await prisma.otpCode.update({ where: { id: otp.id }, data: { used: true } });
-
-    let user = await prisma.user.findUnique({ where: { phone: normalized } });
-
-    if (!user) {
-      user = await prisma.user.create({
-        data: { phone: normalized, name: "User", isVerified: true },
-      });
-    }
-
-    const token = jwt.sign(
-      { userId: user.id, phone: user.phone, role: user.role },
-      JWT_SECRET,
-      { expiresIn: "30d" }
-    );
-
-    return NextResponse.json({
-      token,
-      user: { id: user.id, name: user.name, phone: user.phone, role: user.role, avatar: user.avatar },
-    });
-  } catch {
-    return NextResponse.json({ error: "Verification failed" }, { status: 500 });
+  let user = await prisma.user.findUnique({ where: { phone } });
+  if (!user) {
+    user = await prisma.user.create({ data: { phone, name: "User", isVerified: true } });
   }
-}
+
+  const token = signAuthToken({ userId: user.id, phone: user.phone, role: user.role });
+
+  logger.info(`User ${user.id} verified via OTP`);
+
+  return ok({
+    token,
+    user: { id: user.id, name: user.name, phone: user.phone, role: user.role, avatar: user.avatar },
+  });
+});
