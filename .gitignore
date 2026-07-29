@@ -32,6 +32,12 @@ dist/
 # Turbo
 .turbo/
 
+# TypeScript incremental build artifacts
+*.tsbuildinfo
+
+# Test coverage
+coverage/
+
 # Logs
 *.log
 npm-debug.log*
