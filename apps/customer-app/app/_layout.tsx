@@ -4,6 +4,8 @@ import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { useEffect } from "react";
 import { AuthProvider, useAuth } from "@/context/AuthContext";
 import { useNotifications } from "@/hooks/useNotifications";
+import { ErrorBoundary } from "@/components/ErrorBoundary";
+import { LoadingScreen } from "@/components/LoadingScreen";
 
 function NavigationGuard() {
   const { user, token, isLoading } = useAuth();
@@ -18,42 +20,48 @@ function NavigationGuard() {
     if (user && inAuth) router.replace("/(tabs)");
   }, [user, isLoading, segments]);
 
+  if (isLoading) return <LoadingScreen message="Starting up..." />;
   return null;
+}
+
+function AppStack() {
+  return (
+    <Stack screenOptions={{ headerShown: false }}>
+      <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+      <Stack.Screen name="(auth)" options={{ headerShown: false }} />
+      <Stack.Screen
+        name="ride/[id]"
+        options={{
+          headerShown: true,
+          headerTitle: "Ride Details",
+          headerStyle: { backgroundColor: "#0f172a" },
+          headerTintColor: "#f8fafc",
+        }}
+      />
+      <Stack.Screen
+        name="store/[id]"
+        options={{
+          headerShown: true,
+          headerTitle: "Store",
+          headerStyle: { backgroundColor: "#0f172a" },
+          headerTintColor: "#f8fafc",
+        }}
+      />
+      <Stack.Screen name="ride/book" options={{ headerShown: false }} />
+    </Stack>
+  );
 }
 
 export default function RootLayout() {
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
-      <AuthProvider>
-        <NavigationGuard />
-        <StatusBar style="light" />
-        <Stack screenOptions={{ headerShown: false }}>
-          <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-          <Stack.Screen name="(auth)" options={{ headerShown: false }} />
-          <Stack.Screen
-            name="ride/[id]"
-            options={{
-              headerShown: true,
-              headerTitle: "Ride Details",
-              headerStyle: { backgroundColor: "#0f172a" },
-              headerTintColor: "#f8fafc",
-            }}
-          />
-          <Stack.Screen
-            name="store/[id]"
-            options={{
-              headerShown: true,
-              headerTitle: "Store",
-              headerStyle: { backgroundColor: "#0f172a" },
-              headerTintColor: "#f8fafc",
-            }}
-          />
-          <Stack.Screen
-            name="ride/book"
-            options={{ headerShown: false }}
-          />
-        </Stack>
-      </AuthProvider>
+      <ErrorBoundary>
+        <AuthProvider>
+          <NavigationGuard />
+          <StatusBar style="light" />
+          <AppStack />
+        </AuthProvider>
+      </ErrorBoundary>
     </GestureHandlerRootView>
   );
 }
