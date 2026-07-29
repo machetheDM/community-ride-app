@@ -1,6 +1,12 @@
 import { prisma } from "@/lib/prisma";
 import { Car, ShoppingBag, Users, Store, Bike, TrendingUp, Clock, CheckCircle } from "lucide-react";
 
+// This page reports live platform counts, so it must be rendered per request.
+// Without this it was statically prerendered: the build required a reachable
+// database, and the numbers it shipped were frozen at build time. Matches the
+// convention used by every DB-backed page in the merchant portal.
+export const dynamic = "force-dynamic";
+
 async function getStats() {
   const [
     totalRides,
