@@ -5,6 +5,7 @@ generator client {
 
 datasource db {
   provider = "postgresql"
+  schemas  = ["ride"]
 }
 
 // ─────────────────────────────────────────────
@@ -17,16 +18,18 @@ enum UserRole {
   RIDER
   MERCHANT
   ADMIN
-}
 
+  @@schema("ride")
+}
 enum VehicleType {
   SEDAN
   MINIVAN
   BAKKIE
   SCOOTER
   BICYCLE
-}
 
+  @@schema("ride")
+}
 enum RideStatus {
   REQUESTED
   ACCEPTED
@@ -34,8 +37,9 @@ enum RideStatus {
   IN_PROGRESS
   COMPLETED
   CANCELLED
-}
 
+  @@schema("ride")
+}
 enum OrderStatus {
   PENDING
   CONFIRMED
@@ -44,8 +48,9 @@ enum OrderStatus {
   OUT_FOR_DELIVERY
   DELIVERED
   CANCELLED
-}
 
+  @@schema("ride")
+}
 enum DeliveryStatus {
   PENDING
   ASSIGNED
@@ -53,23 +58,26 @@ enum DeliveryStatus {
   EN_ROUTE
   DELIVERED
   FAILED
-}
 
+  @@schema("ride")
+}
 enum PaymentMethod {
   CASH
   CARD
   YOCO
   OZOW
   WALLET
-}
 
+  @@schema("ride")
+}
 enum PaymentStatus {
   PENDING
   COMPLETED
   FAILED
   REFUNDED
-}
 
+  @@schema("ride")
+}
 // ─────────────────────────────────────────────
 // Users & Profiles
 // ─────────────────────────────────────────────
@@ -98,8 +106,9 @@ model User {
   ratingsReceived Rating[]     @relation("RateeRatings")
   notifications Notification[]
   payments      Payment[]
-}
 
+  @@schema("ride")
+}
 model Driver {
   id            String   @id @default(cuid())
   userId        String   @unique
@@ -119,8 +128,9 @@ model Driver {
   vehicle  Vehicle?
   rides    Ride[]
   earnings DriverEarning[]
-}
 
+  @@schema("ride")
+}
 model Rider {
   id              String   @id @default(cuid())
   userId          String   @unique
@@ -138,8 +148,9 @@ model Rider {
   vehicle    Vehicle?
   deliveries Delivery[]
   earnings   RiderEarning[]
-}
 
+  @@schema("ride")
+}
 model Vehicle {
   id           String      @id @default(cuid())
   driverId     String?     @unique
@@ -155,8 +166,9 @@ model Vehicle {
   isApproved   Boolean     @default(false)
   createdAt    DateTime    @default(now())
   updatedAt    DateTime    @updatedAt
-}
 
+  @@schema("ride")
+}
 // ─────────────────────────────────────────────
 // Ride-Hailing
 // ─────────────────────────────────────────────
@@ -192,8 +204,9 @@ model Ride {
   payment   Payment?
   rating    Rating?
   earning   DriverEarning?
-}
 
+  @@schema("ride")
+}
 model RideLocation {
   id        String   @id @default(cuid())
   rideId    String
@@ -202,8 +215,9 @@ model RideLocation {
   lng       Float
   speed     Float?
   timestamp DateTime @default(now())
-}
 
+  @@schema("ride")
+}
 // ─────────────────────────────────────────────
 // Marketplace & Delivery
 // ─────────────────────────────────────────────
@@ -217,8 +231,9 @@ model Merchant {
   updatedAt  DateTime @updatedAt
 
   stores Store[]
-}
 
+  @@schema("ride")
+}
 model Store {
   id           String   @id @default(cuid())
   merchantId   String
@@ -244,8 +259,9 @@ model Store {
   categories StoreCategory[]
   products   Product[]
   orders     Order[]
-}
 
+  @@schema("ride")
+}
 model StoreCategory {
   id        String   @id @default(cuid())
   storeId   String
@@ -255,8 +271,9 @@ model StoreCategory {
   createdAt DateTime @default(now())
 
   products Product[]
-}
 
+  @@schema("ride")
+}
 model Product {
   id          String         @id @default(cuid())
   storeId     String
@@ -273,8 +290,9 @@ model Product {
   updatedAt   DateTime       @updatedAt
 
   orderItems OrderItem[]
-}
 
+  @@schema("ride")
+}
 model Order {
   id              String        @id @default(cuid())
   customerId      String
@@ -303,8 +321,9 @@ model Order {
   payment  Payment?
   rating   Rating?
   earning  RiderEarning?
-}
 
+  @@schema("ride")
+}
 model OrderItem {
   id         String   @id @default(cuid())
   orderId    String
@@ -316,8 +335,9 @@ model OrderItem {
   totalPrice Decimal  @db.Decimal(10, 2)
   notes      String?
   createdAt  DateTime @default(now())
-}
 
+  @@schema("ride")
+}
 model Delivery {
   id               String         @id @default(cuid())
   orderId          String         @unique
@@ -335,8 +355,9 @@ model Delivery {
   updatedAt        DateTime       @updatedAt
 
   locations DeliveryLocation[]
-}
 
+  @@schema("ride")
+}
 model DeliveryLocation {
   id         String   @id @default(cuid())
   deliveryId String
@@ -344,8 +365,9 @@ model DeliveryLocation {
   lat        Float
   lng        Float
   timestamp  DateTime @default(now())
-}
 
+  @@schema("ride")
+}
 // ─────────────────────────────────────────────
 // Payments & Earnings
 // ─────────────────────────────────────────────
@@ -365,8 +387,9 @@ model Payment {
   gatewayRef String?
   createdAt  DateTime      @default(now())
   updatedAt  DateTime      @updatedAt
-}
 
+  @@schema("ride")
+}
 model DriverEarning {
   id         String   @id @default(cuid())
   driverId   String
@@ -377,8 +400,9 @@ model DriverEarning {
   commission Decimal  @db.Decimal(10, 2)
   net        Decimal  @db.Decimal(10, 2)
   createdAt  DateTime @default(now())
-}
 
+  @@schema("ride")
+}
 model RiderEarning {
   id         String   @id @default(cuid())
   riderId    String
@@ -389,8 +413,9 @@ model RiderEarning {
   commission Decimal  @db.Decimal(10, 2)
   net        Decimal  @db.Decimal(10, 2)
   createdAt  DateTime @default(now())
-}
 
+  @@schema("ride")
+}
 // ─────────────────────────────────────────────
 // Ratings & Notifications
 // ─────────────────────────────────────────────
@@ -408,8 +433,9 @@ model Rating {
   score     Int
   comment   String?
   createdAt DateTime @default(now())
-}
 
+  @@schema("ride")
+}
 model Notification {
   id        String   @id @default(cuid())
   userId    String
@@ -420,8 +446,9 @@ model Notification {
   data      Json?
   isRead    Boolean  @default(false)
   createdAt DateTime @default(now())
-}
 
+  @@schema("ride")
+}
 // ─────────────────────────────────────────────
 // Config & Admin
 // ─────────────────────────────────────────────
@@ -437,8 +464,9 @@ model PricingConfig {
   isActive           Boolean  @default(false)
   createdAt          DateTime @default(now())
   updatedAt          DateTime @updatedAt
-}
 
+  @@schema("ride")
+}
 model DeliveryZone {
   id          String   @id @default(cuid())
   name        String
@@ -447,8 +475,9 @@ model DeliveryZone {
   isActive    Boolean  @default(true)
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
-}
 
+  @@schema("ride")
+}
 model OtpCode {
   id        String   @id @default(cuid())
   phone     String
@@ -458,4 +487,6 @@ model OtpCode {
   createdAt DateTime @default(now())
 
   @@index([phone])
+
+  @@schema("ride")
 }
