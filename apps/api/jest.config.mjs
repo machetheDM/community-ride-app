@@ -8,10 +8,14 @@ const createJestConfig = nextJest({ dir: "./" });
  *
  * The HTTP tests under src/test/e2e require a running API server and a seeded
  * database, so they are excluded here and run via `npm run test:e2e`.
+ *
+ * Deliberately .mjs rather than .ts. A TypeScript Jest config makes jest-config
+ * load ts-node, which it resolves from its own location inside
+ * node_modules/@jest/core/. In an npm workspace ts-node often lands nested under
+ * apps/api/node_modules instead of the root, where that lookup cannot reach it —
+ * so the suite passed locally and failed in CI. A .mjs config needs no
+ * transpiler, so the dependency disappears rather than being papered over.
  */
-// Intentionally not annotated with jest's `Config`: react-native pins jest 29
-// at the workspace root, so next/jest.js is typed against v29 option types while
-// `jest` here is v30. Letting the literal infer keeps both sides satisfied.
 const config = {
   testEnvironment: "node",
   moduleNameMapper: {

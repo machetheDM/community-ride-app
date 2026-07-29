@@ -11,8 +11,8 @@ const createJestConfig = nextJest({ dir: "./" });
  *   npm run test:e2e     # in another shell
  *
  * Override the target with API_BASE_URL if the server is elsewhere.
+ * See jest.config.mjs for why this is .mjs and not .ts.
  */
-// See jest.config.ts for why this is not annotated with jest's `Config`.
 const config = {
   testEnvironment: "node",
   moduleNameMapper: {
