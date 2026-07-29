@@ -4,18 +4,24 @@ import { ShoppingBag, Package, DollarSign, Store as StoreIcon, ArrowRight } from
 import { prisma } from "@/lib/prisma";
 import { getSession } from "@/lib/session";
 import { AutoRefresh } from "@/components/AutoRefresh";
+import { PageHeader } from "@/components/ui/PageHeader";
+import { Card } from "@/components/ui/Card";
+import { Badge } from "@/components/ui/Badge";
+import { StatCard } from "@/components/ui/StatCard";
+import { Avatar } from "@/components/ui/Avatar";
+import { EmptyState } from "@/components/ui/EmptyState";
 
 export const metadata = { title: "Overview" };
 export const dynamic = "force-dynamic";
 
-const statusBadge: Record<string, string> = {
-  PENDING: "bg-blue-500/10 text-blue-400",
-  CONFIRMED: "bg-indigo-500/10 text-indigo-400",
-  PREPARING: "bg-amber-500/10 text-amber-400",
-  READY_FOR_PICKUP: "bg-cyan-500/10 text-cyan-400",
-  OUT_FOR_DELIVERY: "bg-orange-500/10 text-orange-400",
-  DELIVERED: "bg-emerald-500/10 text-emerald-400",
-  CANCELLED: "bg-red-500/10 text-red-400",
+const statusVariant: Record<string, "default" | "success" | "warning" | "danger" | "info" | "neutral"> = {
+  PENDING: "info",
+  CONFIRMED: "info",
+  PREPARING: "warning",
+  READY_FOR_PICKUP: "warning",
+  OUT_FOR_DELIVERY: "default",
+  DELIVERED: "success",
+  CANCELLED: "danger",
 };
 
 export default async function MerchantDashboard() {
@@ -49,31 +55,24 @@ export default async function MerchantDashboard() {
 
   const revenueToday = deliveredToday.reduce((sum, o) => sum + Number(o.total), 0);
 
-  const stats = [
-    { label: "Today's Orders", value: String(todayOrders), sub: `${pendingOrders} need action`, icon: ShoppingBag, color: "text-amber-400", bg: "bg-amber-500/10" },
-    { label: "Active Products", value: String(activeProducts), sub: "available", icon: Package, color: "text-blue-400", bg: "bg-blue-500/10" },
-    { label: "Today's Revenue", value: `R ${revenueToday.toFixed(0)}`, sub: `${deliveredToday.length} delivered`, icon: DollarSign, color: "text-emerald-400", bg: "bg-emerald-500/10" },
-    { label: "Stores Open", value: `${stores.filter((s) => s.isOpen).length}/${stores.length}`, sub: "accepting orders", icon: StoreIcon, color: "text-purple-400", bg: "bg-purple-500/10" },
-  ];
-
   return (
     <div className="p-8">
       <AutoRefresh intervalMs={15000} />
 
-      <div className="mb-8">
-        <h1 className="text-2xl font-bold text-slate-100">Welcome back, {session.name}</h1>
-        <p className="text-slate-400 text-sm mt-1">
-          {new Date().toLocaleDateString("en-ZA", { weekday: "long", year: "numeric", month: "long", day: "numeric" })}
-        </p>
-      </div>
+      <PageHeader
+        title={`Welcome back, ${session.name}`}
+        subtitle={new Date().toLocaleDateString("en-ZA", { weekday: "long", year: "numeric", month: "long", day: "numeric" })}
+      />
 
       {pendingOrders > 0 && (
         <Link
           href="/dashboard/orders"
-          className="mb-6 flex items-center justify-between gap-3 p-4 bg-amber-500/10 border border-amber-500/30 rounded-xl hover:bg-amber-500/15 transition-colors"
+          className="mb-8 flex items-center justify-between gap-3 p-4 bg-amber-500/10 border border-amber-500/30 rounded-2xl hover:bg-amber-500/15 transition-colors"
         >
           <div className="flex items-center gap-3">
-            <ShoppingBag size={18} className="text-amber-400 shrink-0" />
+            <div className="p-2.5 rounded-xl bg-amber-500/10">
+              <ShoppingBag size={18} className="text-amber-400 shrink-0" />
+            </div>
             <div>
               <p className="text-amber-300 text-sm font-semibold">
                 {pendingOrders} {pendingOrders === 1 ? "order needs" : "orders need"} your attention
@@ -86,55 +85,41 @@ export default async function MerchantDashboard() {
       )}
 
       <div className="grid grid-cols-2 xl:grid-cols-4 gap-4 mb-8">
-        {stats.map(({ label, value, sub, icon: Icon, color, bg }) => (
-          <div key={label} className="bg-[#1e293b] rounded-xl p-5 border border-slate-700">
-            <div className="flex items-start justify-between">
-              <div>
-                <p className="text-slate-400 text-xs font-medium uppercase tracking-wide">{label}</p>
-                <p className="text-2xl font-bold text-slate-100 mt-1">{value}</p>
-                <p className="text-slate-500 text-xs mt-1">{sub}</p>
-              </div>
-              <div className={`${bg} p-2.5 rounded-lg`}>
-                <Icon size={18} className={color} />
-              </div>
-            </div>
-          </div>
-        ))}
+        <StatCard label="Today's Orders" value={String(todayOrders)} sub={`${pendingOrders} need action`} icon={ShoppingBag} color="amber" />
+        <StatCard label="Active Products" value={String(activeProducts)} sub="available" icon={Package} color="blue" />
+        <StatCard label="Today's Revenue" value={`R ${revenueToday.toFixed(0)}`} sub={`${deliveredToday.length} delivered`} icon={DollarSign} color="emerald" />
+        <StatCard label="Stores Open" value={`${stores.filter((s) => s.isOpen).length}/${stores.length}`} sub="accepting orders" icon={StoreIcon} color="purple" />
       </div>
 
-      <div className="bg-[#1e293b] rounded-xl border border-slate-700">
-        <div className="flex items-center justify-between p-5 border-b border-slate-700">
+      <Card padding="none">
+        <div className="flex items-center justify-between p-5 border-b border-slate-700/50">
           <h2 className="text-sm font-semibold text-slate-100">Recent Orders</h2>
           <Link href="/dashboard/orders" className="text-xs text-amber-400 hover:text-amber-300 flex items-center gap-1">
             View all <ArrowRight size={12} />
           </Link>
         </div>
-        <div className="divide-y divide-slate-700">
+        <div className="divide-y divide-slate-700/40">
           {recentOrders.length === 0 ? (
-            <p className="p-8 text-center text-slate-500 text-sm">No orders yet</p>
+            <EmptyState title="No orders yet" description="Orders will appear here once customers start ordering." />
           ) : (
             recentOrders.map((order) => (
               <div key={order.id} className="flex items-center justify-between p-4 gap-3">
                 <div className="flex items-center gap-3 min-w-0">
-                  <div className="w-8 h-8 rounded-full bg-slate-700 flex items-center justify-center text-slate-200 text-xs font-bold shrink-0">
-                    {order.customer.name.charAt(0).toUpperCase()}
-                  </div>
+                  <Avatar name={order.customer.name} size="sm" />
                   <div className="min-w-0">
-                    <p className="text-slate-200 text-sm font-medium truncate">{order.customer.name}</p>
+                    <p className="text-slate-200 text-sm font-semibold truncate">{order.customer.name}</p>
                     <p className="text-slate-500 text-xs truncate">{order.store.name}</p>
                   </div>
                 </div>
                 <div className="flex items-center gap-3 shrink-0">
-                  <span className={`text-[11px] px-2 py-1 rounded-md font-medium ${statusBadge[order.status] ?? "bg-slate-700 text-slate-300"}`}>
-                    {order.status.replace(/_/g, " ")}
-                  </span>
+                  <Badge variant={statusVariant[order.status] ?? "neutral"}>{order.status.replace(/_/g, " ")}</Badge>
                   <span className="text-slate-400 text-sm w-20 text-right">R {Number(order.total).toFixed(2)}</span>
                 </div>
               </div>
             ))
           )}
         </div>
-      </div>
+      </Card>
     </div>
   );
 }

@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from "react";
 import {
   View, Text, StyleSheet, TouchableOpacity, ScrollView, SafeAreaView,
-  RefreshControl,
+  RefreshControl, ActivityIndicator,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
@@ -35,6 +35,7 @@ export default function HomeScreen() {
   const router = useRouter();
   const { user, token } = useAuth();
   const [activeRide, setActiveRide] = useState<ActiveRide | null>(null);
+  const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
 
   const getGreeting = () => {
@@ -55,6 +56,8 @@ export default function HomeScreen() {
       setActiveRide(rides[0] ?? null);
     } catch {
       setActiveRide(null);
+    } finally {
+      setLoading(false);
     }
   }, [token]);
 
@@ -65,6 +68,17 @@ export default function HomeScreen() {
     await fetchActiveRide();
     setRefreshing(false);
   }, [fetchActiveRide]);
+
+  if (loading) {
+    return (
+      <SafeAreaView style={styles.container}>
+        <View style={styles.loader}>
+          <ActivityIndicator size="large" color="#f59e0b" />
+          <Text style={styles.loaderText}>Loading your ride…</Text>
+        </View>
+      </SafeAreaView>
+    );
+  }
 
   return (
     <SafeAreaView style={styles.container}>
@@ -162,6 +176,8 @@ export default function HomeScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: "#0f172a" },
+  loader: { flex: 1, alignItems: "center", justifyContent: "center" },
+  loaderText: { marginTop: 16, color: "#94a3b8", fontSize: 14 },
   header: {
     flexDirection: "row",
     justifyContent: "space-between",

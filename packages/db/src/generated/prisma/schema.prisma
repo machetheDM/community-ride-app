@@ -5,6 +5,7 @@ generator client {
 
 datasource db {
   provider = "postgresql"
+  schemas  = ["ride"]
 }
 
 // ─────────────────────────────────────────────
@@ -17,6 +18,8 @@ enum UserRole {
   RIDER
   MERCHANT
   ADMIN
+
+  @@schema("ride")
 }
 
 enum VehicleType {
@@ -25,6 +28,8 @@ enum VehicleType {
   BAKKIE
   SCOOTER
   BICYCLE
+
+  @@schema("ride")
 }
 
 enum RideStatus {
@@ -34,6 +39,8 @@ enum RideStatus {
   IN_PROGRESS
   COMPLETED
   CANCELLED
+
+  @@schema("ride")
 }
 
 enum OrderStatus {
@@ -44,6 +51,8 @@ enum OrderStatus {
   OUT_FOR_DELIVERY
   DELIVERED
   CANCELLED
+
+  @@schema("ride")
 }
 
 enum DeliveryStatus {
@@ -53,6 +62,8 @@ enum DeliveryStatus {
   EN_ROUTE
   DELIVERED
   FAILED
+
+  @@schema("ride")
 }
 
 enum PaymentMethod {
@@ -61,6 +72,8 @@ enum PaymentMethod {
   YOCO
   OZOW
   WALLET
+
+  @@schema("ride")
 }
 
 enum PaymentStatus {
@@ -68,6 +81,8 @@ enum PaymentStatus {
   COMPLETED
   FAILED
   REFUNDED
+
+  @@schema("ride")
 }
 
 // ─────────────────────────────────────────────
@@ -98,6 +113,8 @@ model User {
   ratingsReceived Rating[]       @relation("RateeRatings")
   notifications   Notification[]
   payments        Payment[]
+
+  @@schema("ride")
 }
 
 model Driver {
@@ -119,6 +136,8 @@ model Driver {
   vehicle  Vehicle?
   rides    Ride[]
   earnings DriverEarning[]
+
+  @@schema("ride")
 }
 
 model Rider {
@@ -138,6 +157,8 @@ model Rider {
   vehicle    Vehicle?
   deliveries Delivery[]
   earnings   RiderEarning[]
+
+  @@schema("ride")
 }
 
 model Vehicle {
@@ -155,6 +176,8 @@ model Vehicle {
   isApproved   Boolean     @default(false)
   createdAt    DateTime    @default(now())
   updatedAt    DateTime    @updatedAt
+
+  @@schema("ride")
 }
 
 // ─────────────────────────────────────────────
@@ -192,6 +215,8 @@ model Ride {
   payment   Payment?
   rating    Rating?
   earning   DriverEarning?
+
+  @@schema("ride")
 }
 
 model RideLocation {
@@ -202,6 +227,8 @@ model RideLocation {
   lng       Float
   speed     Float?
   timestamp DateTime @default(now())
+
+  @@schema("ride")
 }
 
 // ─────────────────────────────────────────────
@@ -217,6 +244,8 @@ model Merchant {
   updatedAt  DateTime @updatedAt
 
   stores Store[]
+
+  @@schema("ride")
 }
 
 model Store {
@@ -244,6 +273,8 @@ model Store {
   categories StoreCategory[]
   products   Product[]
   orders     Order[]
+
+  @@schema("ride")
 }
 
 model StoreCategory {
@@ -255,6 +286,8 @@ model StoreCategory {
   createdAt DateTime @default(now())
 
   products Product[]
+
+  @@schema("ride")
 }
 
 model Product {
@@ -273,6 +306,8 @@ model Product {
   updatedAt   DateTime       @updatedAt
 
   orderItems OrderItem[]
+
+  @@schema("ride")
 }
 
 model Order {
@@ -303,6 +338,8 @@ model Order {
   payment  Payment?
   rating   Rating?
   earning  RiderEarning?
+
+  @@schema("ride")
 }
 
 model OrderItem {
@@ -316,6 +353,8 @@ model OrderItem {
   totalPrice Decimal  @db.Decimal(10, 2)
   notes      String?
   createdAt  DateTime @default(now())
+
+  @@schema("ride")
 }
 
 model Delivery {
@@ -335,6 +374,8 @@ model Delivery {
   updatedAt        DateTime       @updatedAt
 
   locations DeliveryLocation[]
+
+  @@schema("ride")
 }
 
 model DeliveryLocation {
@@ -344,6 +385,8 @@ model DeliveryLocation {
   lat        Float
   lng        Float
   timestamp  DateTime @default(now())
+
+  @@schema("ride")
 }
 
 // ─────────────────────────────────────────────
@@ -365,6 +408,8 @@ model Payment {
   gatewayRef String?
   createdAt  DateTime      @default(now())
   updatedAt  DateTime      @updatedAt
+
+  @@schema("ride")
 }
 
 model DriverEarning {
@@ -377,6 +422,8 @@ model DriverEarning {
   commission Decimal  @db.Decimal(10, 2)
   net        Decimal  @db.Decimal(10, 2)
   createdAt  DateTime @default(now())
+
+  @@schema("ride")
 }
 
 model RiderEarning {
@@ -389,6 +436,8 @@ model RiderEarning {
   commission Decimal  @db.Decimal(10, 2)
   net        Decimal  @db.Decimal(10, 2)
   createdAt  DateTime @default(now())
+
+  @@schema("ride")
 }
 
 // ─────────────────────────────────────────────
@@ -408,6 +457,8 @@ model Rating {
   score     Int
   comment   String?
   createdAt DateTime @default(now())
+
+  @@schema("ride")
 }
 
 model Notification {
@@ -420,6 +471,8 @@ model Notification {
   data      Json?
   isRead    Boolean  @default(false)
   createdAt DateTime @default(now())
+
+  @@schema("ride")
 }
 
 // ─────────────────────────────────────────────
@@ -437,6 +490,8 @@ model PricingConfig {
   isActive           Boolean  @default(false)
   createdAt          DateTime @default(now())
   updatedAt          DateTime @updatedAt
+
+  @@schema("ride")
 }
 
 model DeliveryZone {
@@ -447,6 +502,8 @@ model DeliveryZone {
   isActive    Boolean  @default(true)
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
+
+  @@schema("ride")
 }
 
 model OtpCode {
@@ -458,4 +515,5 @@ model OtpCode {
   createdAt DateTime @default(now())
 
   @@index([phone])
+  @@schema("ride")
 }

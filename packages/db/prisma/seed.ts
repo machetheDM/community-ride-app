@@ -267,12 +267,202 @@ async function main() {
     });
   }
 
+  // ── Demo Rider ─────────────────────────────────────────────────
+  const riderUser =
+    (await prisma.user.findUnique({ where: { phone: "+27820000003" } })) ??
+    (await prisma.user.create({
+      data: { phone: "+27820000003", name: "Thandi Rider", isVerified: true, role: "RIDER" },
+    }));
+
+  const rider =
+    (await prisma.rider.findUnique({ where: { userId: riderUser.id } })) ??
+    (await prisma.rider.create({
+      data: {
+        userId: riderUser.id,
+        idNumber: "9202026200088",
+        isApproved: true,
+        isOnline: false,
+        rating: 4.9,
+        currentLat: -26.248,
+        currentLng: 27.854,
+      },
+    }));
+
+  const existingRiderVehicle = await prisma.vehicle.findUnique({ where: { riderId: rider.id } });
+  if (!existingRiderVehicle) {
+    await prisma.vehicle.create({
+      data: {
+        riderId: rider.id,
+        type: "MOTORBIKE",
+        make: "Honda",
+        model: "Wave",
+        year: 2021,
+        color: "Red",
+        licensePlate: "BM 456 GP",
+        isApproved: true,
+      },
+    });
+  }
+
+  // ── Demo Customer ──────────────────────────────────────────────
+  const customerUser =
+    (await prisma.user.findUnique({ where: { phone: "+27830000004" } })) ??
+    (await prisma.user.create({
+      data: { phone: "+27830000004", name: "Lerato Customer", isVerified: true, role: "CUSTOMER", walletBalance: "150" },
+    }));
+
+  // ── Demo Admin ─────────────────────────────────────────────────
+  const adminUser =
+    (await prisma.user.findUnique({ where: { phone: "+27810000000" } })) ??
+    (await prisma.user.create({
+      data: { phone: "+27810000000", name: "Admin User", isVerified: true, role: "ADMIN" },
+    }));
+
+  // ── Pricing Configs ────────────────────────────────────────────
+  await prisma.pricingConfig.upsert({
+    where: { id: "pricing-standard" },
+    update: {},
+    create: {
+      id: "pricing-standard",
+      name: "Standard Ride",
+      baseFare: "15",
+      perKmRate: "8",
+      perMinuteRate: "1.5",
+      minimumFare: "25",
+      platformFeePercent: 10,
+      isActive: true,
+    },
+  });
+
+  await prisma.pricingConfig.upsert({
+    where: { id: "pricing-delivery" },
+    update: {},
+    create: {
+      id: "pricing-delivery",
+      name: "Delivery",
+      baseFare: "20",
+      perKmRate: "6",
+      perMinuteRate: "1",
+      minimumFare: "35",
+      platformFeePercent: 12,
+      isActive: true,
+    },
+  });
+
+  // ── Delivery Zones ─────────────────────────────────────────────
+  const zones = [
+    { id: "zone-soweto", name: "Soweto", fee: "20", lat: -26.265, lng: 27.859, radiusKm: 8 },
+    { id: "zone-alex", name: "Alexandra", fee: "25", lat: -26.102, lng: 28.099, radiusKm: 5 },
+    { id: "zone-tembisa", name: "Tembisa", fee: "30", lat: -26.003, lng: 28.224, radiusKm: 10 },
+  ];
+
+  for (const z of zones) {
+    await prisma.deliveryZone.upsert({
+      where: { id: z.id },
+      update: {},
+      create: {
+        id: z.id,
+        name: z.name,
+        feeAmount: z.fee,
+        centerLat: z.lat,
+        centerLng: z.lng,
+        radiusKm: z.radiusKm,
+        isActive: true,
+      },
+    });
+  }
+
+  // ── Demo Order ─────────────────────────────────────────────────
+  const order = await prisma.order.upsert({
+    where: { id: "order-demo-001" },
+    update: {},
+    create: {
+      id: "order-demo-001",
+      storeId: kitchen.id,
+      customerId: customerUser.id,
+      status: "PENDING",
+      deliveryAddress: "5 Mooki St, Soweto",
+      deliveryLat: -26.27,
+      deliveryLng: 27.86,
+      subtotal: "110",
+      deliveryFee: "20",
+      total: "130",
+      items: {
+        create: [
+          { productId: "prod-pap-vleis", quantity: 1, unitPrice: "65" },
+          { productId: "prod-mageu", quantity: 2, unitPrice: "22" },
+          { productId: "prod-chakalaka", quantity: 1, unitPrice: "45" },
+        ],
+      },
+    },
+  });
+
+  // ── Demo Ride ──────────────────────────────────────────────────
+  const ride = await prisma.ride.upsert({
+    where: { id: "ride-demo-001" },
+    update: {},
+    create: {
+      id: "ride-demo-001",
+      customerId: customerUser.id,
+      driverId: driver.id,
+      status: "COMPLETED",
+      pickupAddress: "Soweto Mall, Soweto",
+      dropoffAddress: "Maponya Mall, Soweto",
+      pickupLat: -26.265,
+      pickupLng: 27.859,
+      dropoffLat: -26.248,
+      dropoffLng: 27.854,
+      distanceKm: 4.2,
+      vehicleType: "SEDAN",
+      fare: "55",
+      platformFee: "5.5",
+      total: "55",
+      completedAt: new Date(Date.now() - 1000 * 60 * 60 * 2),
+    },
+  });
+
+  // ── Demo Payments ──────────────────────────────────────────────
+  await prisma.payment.upsert({
+    where: { id: "pay-order-001" },
+    update: {},
+    create: {
+      id: "pay-order-001",
+      orderId: order.id,
+      userId: customerUser.id,
+      amount: order.total,
+      method: "CASH",
+      status: "PENDING",
+      type: "ORDER",
+      reference: "ORDER-001",
+    },
+  });
+
+  await prisma.payment.upsert({
+    where: { id: "pay-ride-001" },
+    update: {},
+    create: {
+      id: "pay-ride-001",
+      rideId: ride.id,
+      userId: customerUser.id,
+      amount: ride.total,
+      method: "WALLET",
+      status: "COMPLETED",
+      type: "RIDE",
+      reference: "RIDE-001",
+    },
+  });
+
   console.log("✅ Seeded:");
   console.log(`   • 1 merchant`);
   console.log(`   • 4 stores (Mama's Kitchen, TownSquare Grocery, Pharm24, Kasi Fashion Hub)`);
   console.log(`   • 8 categories`);
   console.log(`   • ${kitchenProducts.length + groceryProducts.length + pharmProducts.length + fashionProducts.length} products`);
   console.log(`   • 1 driver (Sipho Driver, +27820000002, White Toyota Corolla CR 123 GP)`);
+  console.log(`   • 1 rider (Thandi Rider, +27820000003, Red Honda Wave BM 456 GP)`);
+  console.log(`   • 1 customer (Lerato Customer, +27830000004)`);
+  console.log(`   • 1 admin (+27810000000)`);
+  console.log(`   • 2 pricing configs, 3 delivery zones`);
+  console.log(`   • 1 demo order + 1 demo ride + 2 payments`);
 }
 
 main()

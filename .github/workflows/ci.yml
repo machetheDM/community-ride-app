@@ -1,0 +1,66 @@
+name: CI
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main]
+
+# A newer push to the same ref supersedes an in-flight run.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  # Prisma instantiates its client at module import, so the build needs a
+  # syntactically valid connection string. Nothing here connects to a database:
+  # every DB-backed page is force-dynamic and the unit tests do not touch one.
+  DATABASE_URL: postgresql://ci:ci@localhost:5432/ci
+  DIRECT_URL: postgresql://ci:ci@localhost:5432/ci
+  JWT_SECRET: ci-test-secret-not-used-in-production
+
+jobs:
+  lint:
+    name: Lint & Type Check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+          cache: "npm"
+      - run: npm ci
+      - name: Lint
+        run: npx turbo lint
+      - name: Type check
+        run: npx turbo typecheck
+
+  test:
+    name: Unit Tests
+    runs-on: ubuntu-latest
+    needs: lint
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+          cache: "npm"
+      - run: npm ci
+      - name: Run unit tests
+        run: npx turbo test
+        env:
+          NODE_ENV: test
+
+  build:
+    name: Build
+    runs-on: ubuntu-latest
+    needs: test
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+          cache: "npm"
+      - run: npm ci
+      - name: Build web apps
+        run: npx turbo build
