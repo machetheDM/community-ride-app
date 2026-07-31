@@ -50,8 +50,39 @@ community-ride-app/
 │   ├── maps-service/     ← Google Maps Platform integration (3 subpath exports)
 │   ├── push-service/     ← Push notifications: Expo + FCM dual transport
 │   └── analytics/        ← BigQuery event streaming + dashboard queries
+├── infra/gcp/            ← Terraform: budget, Cloud Run, BigQuery, IAM, WIF
+├── scripts/              ← ETA model training
+├── docs/                 ← Architecture and cost documentation
 └── .github/workflows/    ← CI/CD
 ```
+
+## Google Cloud
+
+Five GCP services, in varying states of readiness — the distinction is stated, not blurred:
+
+| Service | Code | Provisioned |
+|---|---|---|
+| Maps Platform | ✅ | ❌ |
+| Firebase Cloud Messaging | ✅ | ❌ |
+| BigQuery | ✅ | ❌ |
+| Cloud Run | ✅ Dockerfile + Terraform | ❌ |
+| Vertex AI | Documented, **deliberately deferred** | ❌ |
+
+**No GCP project exists and nothing has been provisioned.** The app runs without any of it: no Maps
+key means `/api/maps/*` returns 503 and everything else works; no Firebase credentials means Expo
+Push handles notifications alone; no BigQuery dataset means analytics writes are no-ops and the
+dashboard says so. A portfolio project that only runs against a live cloud account is one nobody can
+review.
+
+Vertex AI is deferred because the database holds **one** completed trip against a 200-trip
+threshold. `scripts/train_eta_model.py` enforces that in code rather than leaving it to discipline,
+and refuses to save a model that fails to beat the Google Maps baseline.
+
+- [`docs/gcp-architecture.md`](docs/gcp-architecture.md) — architecture diagram, security posture, cost-scaling narrative
+- [`docs/maps-platform-cost-estimate.md`](docs/maps-platform-cost-estimate.md) — cost model, and why the $200 credit no longer exists
+- [`docs/cloud-run-deployment.md`](docs/cloud-run-deployment.md) — image, cold starts, when to raise `min_instances`
+- [`docs/vertex-ai-eta-model.md`](docs/vertex-ai-eta-model.md) — model design and the deferral
+- [`infra/gcp/README.md`](infra/gcp/README.md) — ordered provisioning steps
 
 ## Key Production Practices
 
