@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getAuthUser } from "@/lib/auth";
 import { sendPushToUser } from "@/lib/notifications";
+import { emitTripEvent } from "@/lib/analytics";
 
 const RIDE_STATUS_MESSAGES: Record<string, { title: string; body: string }> = {
   ACCEPTED:       { title: "Driver found! 🚗", body: "A driver accepted your ride and is on the way." },
@@ -82,6 +83,12 @@ export async function PATCH(
         where: { id: ride.driverId },
         data: { totalRides: { increment: 1 } },
       });
+    }
+
+    // Stream the terminal state to BigQuery. Synchronous call, fire-and-forget
+    // internally — a failed analytics write must never fail a completed trip.
+    if (status === "COMPLETED" || status === "CANCELLED") {
+      emitTripEvent(ride);
     }
 
     // Notify the customer of the status change.

@@ -48,7 +48,8 @@ community-ride-app/
 │   ├── db/               ← Prisma 7 schema + shared PostgreSQL client
 │   ├── types/            ← Shared domain types
 │   ├── maps-service/     ← Google Maps Platform integration (3 subpath exports)
-│   └── push-service/     ← Push notifications: Expo + FCM dual transport
+│   ├── push-service/     ← Push notifications: Expo + FCM dual transport
+│   └── analytics/        ← BigQuery event streaming + dashboard queries
 └── .github/workflows/    ← CI/CD
 ```
 
@@ -131,6 +132,35 @@ succeeded; a ride is still accepted whether or not the notification lands.
 **Triggers:** driver assigned · driver arriving (ETA threshold) · trip started · new ride request →
 drivers · order picked up · order delivered.
 
+### BigQuery analytics
+
+`packages/analytics` streams a row when a trip or an order reaches a terminal state, and provides
+the read queries behind the **Analytics** page in the merchant portal (trips per day by area,
+demand by township, peak hours, cancellation rate, and Maps ETA accuracy).
+
+Two rules govern it:
+
+- **Analytics never breaks the business operation.** Writes resolve rather than reject, are not
+  awaited into the response path, and are bounded by a timeout. A BigQuery outage, an expired
+  credential or a schema drift cannot fail a ride.
+- **Unconfigured is a valid state.** With `BIGQUERY_DATASET` unset every write is a no-op, so CI
+  and local development are unaffected.
+
+**Identifiers are pseudonymised before they leave the operational database.** None of the questions
+this dataset answers need to identify a person, so customer and driver ids are stored as a salted
+SHA-256 — enough to count distinct riders, useless for looking someone up. Without
+`ANALYTICS_HASH_SALT` those columns are written as `NULL` rather than as an unsalted hash, which
+over a known id space would be reversible and a false assurance of anonymity. Addresses are reduced
+to a suburb label, never the street line.
+
+The dashboard distinguishes **not configured**, **configured but empty**, and **has data**.
+Collapsing the first two into "0 trips" would present an unconfigured system as a quiet one. There
+is no sample data on the page: with one seeded trip it renders near-empty, which is correct.
+
+Every query is date-bounded, selects named columns, and caps `maximumBytesBilled` — BigQuery's free
+tier is 1 TiB of query processing per month and `SELECT *` on a growing events table is how that
+gets spent.
+
 ### Fares are calculated server-side
 
 Ride fares are derived by the API from the routed distance and duration, priced against the
@@ -140,10 +170,10 @@ relation to the actual trip, and a crafted request could book a R0 ride. `POST /
 accepts a price from the client.
 
 ### Testing & CI
-- **117 Jest unit tests** covering validation schemas, pagination bounds, the rate
+- **132 Jest unit tests** covering validation schemas, pagination bounds, the rate
   limiter, JWT signing/verification, sanitization, response envelopes, fare
-  calculation, the Maps client, the geocode cache, push transport selection and
-  the arrival-notification distance filter
+  calculation, the Maps client, the geocode cache, push transport selection, the
+  arrival-notification distance filter, and analytics pseudonymisation
 - **No unit test touches the network.** `src/test/setup.ts` replaces `global.fetch`
   with a stub that throws. This was added after a maps test whose module mock
   silently failed to apply fell through to the real client and issued a live

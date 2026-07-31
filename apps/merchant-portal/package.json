@@ -10,6 +10,7 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@ride/analytics": "*",
     "@ride/db": "*",
     "@ride/push-service": "*",
     "@ride/types": "*",

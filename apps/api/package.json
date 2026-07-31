@@ -14,6 +14,7 @@
     "test:e2e": "jest --config jest.e2e.config.mjs"
   },
   "dependencies": {
+    "@ride/analytics": "*",
     "@ride/db": "*",
     "@ride/maps-service": "*",
     "@ride/push-service": "*",
