@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getAuthUser } from "@/lib/auth";
+import { maybeNotifyArrival } from "@/lib/arrival";
 
 export async function GET(req: NextRequest) {
   try {
@@ -43,6 +44,15 @@ export async function PATCH(req: NextRequest) {
         ...(heading !== undefined ? { heading } : {}),
       },
     });
+
+    // A new position may mean the driver is now close enough to pickup to warn the
+    // customer. Fire-and-forget: the driver's location update is the operation
+    // being requested here and must not wait on, or fail with, a notification.
+    if (typeof currentLat === "number" && typeof currentLng === "number") {
+      maybeNotifyArrival(driver.id, { lat: currentLat, lng: currentLng }).catch(() => {
+        /* maybeNotifyArrival logs its own failures */
+      });
+    }
 
     return NextResponse.json({ success: true, data: driver });
   } catch {

@@ -61,17 +61,69 @@ export const paginationSchema = z.object({
   pageSize: z.coerce.number().int().min(1).max(100).default(20),
 });
 
+/**
+ * Note the absence of `fareEstimate`.
+ *
+ * It used to be accepted from the client and stored verbatim, which made the price
+ * of a ride whatever the caller said it was. The server now derives it from the
+ * routed distance and `PricingConfig` (see `lib/fare.ts`). Zod strips unknown keys
+ * by default, so an older app build still sending the field is harmless — the value
+ * is simply discarded rather than trusted.
+ *
+ * Coordinates stay optional: when the app supplies them (from autocomplete) the
+ * server uses them directly, and when it does not the server geocodes the address
+ * itself. Either way a ride is never stored at 0,0 the way it was before.
+ */
 export const rideCreateSchema = z.object({
-  pickupAddress: z.string().min(1, "Pickup address is required"),
-  dropoffAddress: z.string().min(1, "Dropoff address is required"),
-  pickupLat: z.number().optional(),
-  pickupLng: z.number().optional(),
-  dropoffLat: z.number().optional(),
-  dropoffLng: z.number().optional(),
+  pickupAddress: z.string().min(1, "Pickup address is required").max(300),
+  dropoffAddress: z.string().min(1, "Dropoff address is required").max(300),
+  pickupLat: z.number().min(-90).max(90).optional(),
+  pickupLng: z.number().min(-180).max(180).optional(),
+  dropoffLat: z.number().min(-90).max(90).optional(),
+  dropoffLng: z.number().min(-180).max(180).optional(),
   vehicleType: z.enum(["SEDAN", "MINIVAN", "BAKKIE", "SCOOTER", "BICYCLE"]).default("SEDAN"),
-  fareEstimate: z.number().min(0).default(0),
   paymentMethod: z.enum(["CASH", "CARD", "YOCO", "OZOW", "WALLET"]).default("CASH"),
   scheduledAt: z.string().datetime().optional(),
+});
+
+// ── Maps proxy schemas ──
+
+const latLngSchema = z.object({
+  lat: z.number().min(-90).max(90),
+  lng: z.number().min(-180).max(180),
+});
+
+export const geocodeSchema = z.object({
+  address: z.string().min(1, "Address is required").max(300),
+});
+
+export const routeSchema = z.object({
+  origin: latLngSchema,
+  destination: latLngSchema,
+});
+
+export const autocompleteSchema = z.object({
+  input: z.string().min(1, "Search text is required").max(200),
+  // Required, not optional: without it every keystroke bills against the Per
+  // Request SKU instead of the free Session SKU.
+  sessionToken: z.string().min(8).max(64),
+  bias: z
+    .object({
+      center: latLngSchema,
+      radiusMeters: z.number().min(1).max(50_000),
+    })
+    .optional(),
+});
+
+export const placeResolveSchema = z.object({
+  placeId: z.string().min(1, "Place ID is required").max(300),
+  sessionToken: z.string().min(8).max(64),
+});
+
+export const fareQuoteSchema = z.object({
+  origin: latLngSchema,
+  destination: latLngSchema,
+  vehicleType: z.enum(["SEDAN", "MINIVAN", "BAKKIE", "SCOOTER", "BICYCLE"]).default("SEDAN"),
 });
 
 export const rideUpdateSchema = z.object({
@@ -113,8 +165,15 @@ export const otpVerifySchema = z.object({
   code: z.string().length(6, "OTP must be 6 digits"),
 });
 
+export const deliveryStatusSchema = z.object({
+  status: z.enum(["ASSIGNED", "PICKED_UP", "EN_ROUTE", "DELIVERED", "FAILED"]),
+  failReason: z.string().max(500).optional(),
+});
+
 export const pushTokenSchema = z.object({
-  token: z.string().min(1, "Push token is required"),
+  // Bounded: this value is stored and later sent upstream. Expo tokens run to
+  // about 50 characters and FCM registration tokens to roughly 200.
+  token: z.string().min(1, "Push token is required").max(512),
 });
 
 export const driverUpdateSchema = z.object({
