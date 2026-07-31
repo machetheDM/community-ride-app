@@ -165,8 +165,15 @@ export const otpVerifySchema = z.object({
   code: z.string().length(6, "OTP must be 6 digits"),
 });
 
+export const deliveryStatusSchema = z.object({
+  status: z.enum(["ASSIGNED", "PICKED_UP", "EN_ROUTE", "DELIVERED", "FAILED"]),
+  failReason: z.string().max(500).optional(),
+});
+
 export const pushTokenSchema = z.object({
-  token: z.string().min(1, "Push token is required"),
+  // Bounded: this value is stored and later sent upstream. Expo tokens run to
+  // about 50 characters and FCM registration tokens to roughly 200.
+  token: z.string().min(1, "Push token is required").max(512),
 });
 
 export const driverUpdateSchema = z.object({

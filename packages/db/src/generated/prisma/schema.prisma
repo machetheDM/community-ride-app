@@ -99,9 +99,18 @@ model User {
   isVerified    Boolean  @default(false)
   isActive      Boolean  @default(true)
   walletBalance Decimal  @default(0) @db.Decimal(10, 2)
-  fcmToken      String?
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
+
+  // Named `fcmToken` until it was noticed that it never held an FCM token — the
+  // apps register through Expo's push service and store an `ExponentPushToken[…]`.
+  // Expo relays to FCM on Android, so the old name described the last hop rather
+  // than the value. Renamed in the schema; `@map` keeps the existing column so
+  // `prisma db push` does not drop it. `pushProvider` records which transport the
+  // stored token belongs to.
+  pushToken    String? @map("fcmToken")
+  pushProvider String  @default("expo") // expo | fcm
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   driverProfile   Driver?
   riderProfile    Rider?

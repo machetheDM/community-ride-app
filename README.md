@@ -47,7 +47,8 @@ community-ride-app/
 ├── packages/
 │   ├── db/               ← Prisma 7 schema + shared PostgreSQL client
 │   ├── types/            ← Shared domain types
-│   └── maps-service/     ← Google Maps Platform integration (3 subpath exports)
+│   ├── maps-service/     ← Google Maps Platform integration (3 subpath exports)
+│   └── push-service/     ← Push notifications: Expo + FCM dual transport
 └── .github/workflows/    ← CI/CD
 ```
 
@@ -108,6 +109,28 @@ Places Autocomplete, which moved to Legacy status in the March 2025 pricing chan
 Cost model, and why the widely-cited $200 monthly credit no longer exists:
 [`docs/maps-platform-cost-estimate.md`](docs/maps-platform-cost-estimate.md).
 
+### Push notifications — two transports
+
+`packages/push-service` sends over **Expo Push** and **Firebase Cloud Messaging**, choosing per
+message by the shape of the token. Expo Go builds register an `ExponentPushToken[…]` and relay
+through FCM automatically; a development or EAS build issues a native FCM token that goes direct.
+Both paths are live code, so Expo Go keeps working today and FCM takes over the moment a dev build
+ships — no migration step.
+
+`User.fcmToken` was renamed to `pushToken` (with `@map` preserving the column) because it never
+held an FCM token. `pushProvider` records which transport a stored token belongs to, but the send
+path re-derives it per message, so a device switching build types is routed correctly immediately.
+
+Both Next.js apps share this package. They previously kept separate copies, and the merchant
+portal's dropped any token not starting with `ExponentPushToken[` — once FCM tokens existed,
+merchant-triggered order notifications would have gone nowhere while still reporting success.
+
+Nothing in the transport throws. A push is a courtesy on top of an operation that already
+succeeded; a ride is still accepted whether or not the notification lands.
+
+**Triggers:** driver assigned · driver arriving (ETA threshold) · trip started · new ride request →
+drivers · order picked up · order delivered.
+
 ### Fares are calculated server-side
 
 Ride fares are derived by the API from the routed distance and duration, priced against the
@@ -117,9 +140,10 @@ relation to the actual trip, and a crafted request could book a R0 ride. `POST /
 accepts a price from the client.
 
 ### Testing & CI
-- **95 Jest unit tests** covering validation schemas, pagination bounds, the rate
+- **117 Jest unit tests** covering validation schemas, pagination bounds, the rate
   limiter, JWT signing/verification, sanitization, response envelopes, fare
-  calculation, the Maps client and the geocode cache
+  calculation, the Maps client, the geocode cache, push transport selection and
+  the arrival-notification distance filter
 - **No unit test touches the network.** `src/test/setup.ts` replaces `global.fetch`
   with a stub that throws. This was added after a maps test whose module mock
   silently failed to apply fell through to the real client and issued a live
@@ -150,6 +174,7 @@ accepts a price from the client.
 - `POST /api/maps/route` — route with polyline
 - `POST /api/maps/eta` — travel time and distance
 - `POST /api/maps/autocomplete` — address suggestions; `PUT` resolves the selection
+- `PATCH /api/deliveries/[id]/status` — rider-side delivery lifecycle
 - `GET /api/orders` — list orders with pagination & status filter
 - `POST /api/orders` — place a marketplace order
 - `GET /api/drivers` — list drivers with online/approved filters

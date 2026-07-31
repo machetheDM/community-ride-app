@@ -73,7 +73,7 @@ export async function PATCH(
     const ride = await prisma.ride.update({
       where: { id },
       data,
-      include: { customer: { select: { id: true, fcmToken: true } }, driver: true },
+      include: { customer: { select: { id: true, pushToken: true } }, driver: true },
     });
 
     // Credit the driver's completed-rides counter.
@@ -86,8 +86,8 @@ export async function PATCH(
 
     // Notify the customer of the status change.
     const msg = RIDE_STATUS_MESSAGES[status as string];
-    if (msg && ride.customer.fcmToken) {
-      await sendPushToUser(ride.customer.fcmToken, msg.title, msg.body, {
+    if (msg && ride.customer.pushToken) {
+      await sendPushToUser(ride.customer.pushToken, msg.title, msg.body, {
         rideId: ride.id,
         screen: "ride",
       });
