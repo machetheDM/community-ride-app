@@ -73,3 +73,18 @@ export function __resetRateLimitStore(): void {
 export const defaultLimiter = rateLimit({ windowMs: 60_000, maxRequests: 60 });
 export const authLimiter = rateLimit({ windowMs: 60_000, maxRequests: 10 });
 export const strictLimiter = rateLimit({ windowMs: 60_000, maxRequests: 5 });
+
+/**
+ * Limiters for the Google Maps proxy routes.
+ *
+ * These exist for cost, not abuse: each call through them consumes billable Maps
+ * quota, so an unbounded proxy would let one client spend real money. The ceilings
+ * are set well above what booking a ride needs and well below what a runaway loop
+ * or a scraped token could burn.
+ *
+ * Autocomplete is looser because typing an address legitimately fires a request per
+ * keystroke — and it is the one Maps SKU that stays free at any volume, provided
+ * the session token is used, so the cost pressure there is much lower.
+ */
+export const mapsLimiter = rateLimit({ windowMs: 60_000, maxRequests: 20 });
+export const autocompleteLimiter = rateLimit({ windowMs: 60_000, maxRequests: 100 });

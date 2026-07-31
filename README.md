@@ -45,9 +45,44 @@ community-ride-app/
 │   ├── customer-app/     ← Expo React Native customer app
 │   └── driver-app/       ← Expo React Native driver / rider app
 ├── packages/
-│   └── db/               ← Prisma 7 schema + shared PostgreSQL client
+│   ├── db/               ← Prisma 7 schema + shared PostgreSQL client
+│   ├── types/            ← Shared domain types
+│   ├── maps-service/     ← Google Maps Platform integration (3 subpath exports)
+│   ├── push-service/     ← Push notifications: Expo + FCM dual transport
+│   └── analytics/        ← BigQuery event streaming + dashboard queries
+├── infra/gcp/            ← Terraform: budget, Cloud Run, BigQuery, IAM, WIF
+├── scripts/              ← ETA model training
+├── docs/                 ← Architecture and cost documentation
 └── .github/workflows/    ← CI/CD
 ```
+
+## Google Cloud
+
+Five GCP services, in varying states of readiness — the distinction is stated, not blurred:
+
+| Service | Code | Provisioned |
+|---|---|---|
+| Maps Platform | ✅ | ❌ |
+| Firebase Cloud Messaging | ✅ | ❌ |
+| BigQuery | ✅ | ❌ |
+| Cloud Run | ✅ Dockerfile + Terraform | ❌ |
+| Vertex AI | Documented, **deliberately deferred** | ❌ |
+
+**No GCP project exists and nothing has been provisioned.** The app runs without any of it: no Maps
+key means `/api/maps/*` returns 503 and everything else works; no Firebase credentials means Expo
+Push handles notifications alone; no BigQuery dataset means analytics writes are no-ops and the
+dashboard says so. A portfolio project that only runs against a live cloud account is one nobody can
+review.
+
+Vertex AI is deferred because the database holds **one** completed trip against a 200-trip
+threshold. `scripts/train_eta_model.py` enforces that in code rather than leaving it to discipline,
+and refuses to save a model that fails to beat the Google Maps baseline.
+
+- [`docs/gcp-architecture.md`](docs/gcp-architecture.md) — architecture diagram, security posture, cost-scaling narrative
+- [`docs/maps-platform-cost-estimate.md`](docs/maps-platform-cost-estimate.md) — cost model, and why the $200 credit no longer exists
+- [`docs/cloud-run-deployment.md`](docs/cloud-run-deployment.md) — image, cold starts, when to raise `min_instances`
+- [`docs/vertex-ai-eta-model.md`](docs/vertex-ai-eta-model.md) — model design and the deferral
+- [`infra/gcp/README.md`](infra/gcp/README.md) — ordered provisioning steps
 
 ## Key Production Practices
 
@@ -78,9 +113,102 @@ community-ride-app/
   `@xmldom/xmldom`). Clearing them requires an Expo SDK major upgrade. No
   advisory affects shipped runtime code. This is disclosed, not hidden.
 
+### Google Maps Platform
+
+Routing, geocoding and address autocomplete run through `packages/maps-service`, which exposes
+three deliberately separate entry points:
+
+| Import | Contents | Consumed by |
+|---|---|---|
+| `@ride/maps-service` | Server-side Google client | API only |
+| `@ride/maps-service/client` | Fetch client for the API proxy | Both Expo apps |
+| `@ride/maps-service/native` | `AddressAutocomplete`, `RouteMap` | Both Expo apps |
+
+The split is load-bearing twice over. The API is on React 19 while Expo pins 18.3.1, so React must
+not appear in the package's main entry. And the server client holds the billable API key, so it
+must be impossible to import it from a mobile bundle by accident.
+
+**Two keys, not one.** The Maps SDK render key ships inside the app binaries — that is unavoidable
+and harmless, because the Maps SDK for Android/iOS SKU is free at unlimited volume. Geocoding,
+Routes and Places all bill per request, so those calls go through authenticated, rate-limited proxy
+routes at `/api/maps/*` using a server-only key restricted to the API's egress IP. A bundle-ID
+restriction would not protect a billable key: the restriction is asserted by the caller, and the key
+can be extracted from any APK.
+
+Uses the **Routes API** and **Places API (New)** rather than Directions, Distance Matrix and legacy
+Places Autocomplete, which moved to Legacy status in the March 2025 pricing change.
+
+Cost model, and why the widely-cited $200 monthly credit no longer exists:
+[`docs/maps-platform-cost-estimate.md`](docs/maps-platform-cost-estimate.md).
+
+### Push notifications — two transports
+
+`packages/push-service` sends over **Expo Push** and **Firebase Cloud Messaging**, choosing per
+message by the shape of the token. Expo Go builds register an `ExponentPushToken[…]` and relay
+through FCM automatically; a development or EAS build issues a native FCM token that goes direct.
+Both paths are live code, so Expo Go keeps working today and FCM takes over the moment a dev build
+ships — no migration step.
+
+`User.fcmToken` was renamed to `pushToken` (with `@map` preserving the column) because it never
+held an FCM token. `pushProvider` records which transport a stored token belongs to, but the send
+path re-derives it per message, so a device switching build types is routed correctly immediately.
+
+Both Next.js apps share this package. They previously kept separate copies, and the merchant
+portal's dropped any token not starting with `ExponentPushToken[` — once FCM tokens existed,
+merchant-triggered order notifications would have gone nowhere while still reporting success.
+
+Nothing in the transport throws. A push is a courtesy on top of an operation that already
+succeeded; a ride is still accepted whether or not the notification lands.
+
+**Triggers:** driver assigned · driver arriving (ETA threshold) · trip started · new ride request →
+drivers · order picked up · order delivered.
+
+### BigQuery analytics
+
+`packages/analytics` streams a row when a trip or an order reaches a terminal state, and provides
+the read queries behind the **Analytics** page in the merchant portal (trips per day by area,
+demand by township, peak hours, cancellation rate, and Maps ETA accuracy).
+
+Two rules govern it:
+
+- **Analytics never breaks the business operation.** Writes resolve rather than reject, are not
+  awaited into the response path, and are bounded by a timeout. A BigQuery outage, an expired
+  credential or a schema drift cannot fail a ride.
+- **Unconfigured is a valid state.** With `BIGQUERY_DATASET` unset every write is a no-op, so CI
+  and local development are unaffected.
+
+**Identifiers are pseudonymised before they leave the operational database.** None of the questions
+this dataset answers need to identify a person, so customer and driver ids are stored as a salted
+SHA-256 — enough to count distinct riders, useless for looking someone up. Without
+`ANALYTICS_HASH_SALT` those columns are written as `NULL` rather than as an unsalted hash, which
+over a known id space would be reversible and a false assurance of anonymity. Addresses are reduced
+to a suburb label, never the street line.
+
+The dashboard distinguishes **not configured**, **configured but empty**, and **has data**.
+Collapsing the first two into "0 trips" would present an unconfigured system as a quiet one. There
+is no sample data on the page: with one seeded trip it renders near-empty, which is correct.
+
+Every query is date-bounded, selects named columns, and caps `maximumBytesBilled` — BigQuery's free
+tier is 1 TiB of query processing per month and `SELECT *` on a growing events table is how that
+gets spent.
+
+### Fares are calculated server-side
+
+Ride fares are derived by the API from the routed distance and duration, priced against the
+`PricingConfig` table. The customer app previously computed the fare itself from a hardcoded 5 km
+and posted it as `fareEstimate`, which the API stored verbatim — so the quoted price bore no
+relation to the actual trip, and a crafted request could book a R0 ride. `POST /api/rides` no longer
+accepts a price from the client.
+
 ### Testing & CI
-- **53 Jest unit tests** covering validation schemas, pagination bounds, the rate
-  limiter, JWT signing/verification, sanitization and response envelopes
+- **132 Jest unit tests** covering validation schemas, pagination bounds, the rate
+  limiter, JWT signing/verification, sanitization, response envelopes, fare
+  calculation, the Maps client, the geocode cache, push transport selection, the
+  arrival-notification distance filter, and analytics pseudonymisation
+- **No unit test touches the network.** `src/test/setup.ts` replaces `global.fetch`
+  with a stub that throws. This was added after a maps test whose module mock
+  silently failed to apply fell through to the real client and issued a live
+  request to Google — the suite was reaching the internet and nothing said so.
 - **GitHub Actions pipeline**: lint → type-check → test → build, with lint
   enforced at `--max-warnings 0` and type-checking across all four apps
 - **End-to-end HTTP tests** for `/api/auth` and `/api/stores` live in
@@ -101,7 +229,13 @@ community-ride-app/
 - `POST /api/auth/verify-otp` — verify OTP and receive JWT
 - `GET /api/stores` — list approved stores with search & filters
 - `GET /api/rides` — list rides with pagination & active filter
-- `POST /api/rides` — book a ride
+- `POST /api/rides` — book a ride (server-priced, coordinates resolved)
+- `POST /api/rides/quote` — fare + ETA preview across every vehicle type
+- `POST /api/maps/geocode` — address → coordinates (cached)
+- `POST /api/maps/route` — route with polyline
+- `POST /api/maps/eta` — travel time and distance
+- `POST /api/maps/autocomplete` — address suggestions; `PUT` resolves the selection
+- `PATCH /api/deliveries/[id]/status` — rider-side delivery lifecycle
 - `GET /api/orders` — list orders with pagination & status filter
 - `POST /api/orders` — place a marketplace order
 - `GET /api/drivers` — list drivers with online/approved filters

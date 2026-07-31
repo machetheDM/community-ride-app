@@ -1,0 +1,18 @@
+{
+  "name": "@ride/analytics",
+  "version": "0.1.0",
+  "private": true,
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@google-cloud/bigquery": "^8.1.1"
+  },
+  "devDependencies": {
+    "@types/node": "^20",
+    "typescript": "^5.8.0"
+  }
+}

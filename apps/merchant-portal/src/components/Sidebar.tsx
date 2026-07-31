@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { LayoutDashboard, ShoppingBag, Store, Users, Car, Bike, CreditCard, Settings, LogOut, Building2 } from "lucide-react";
+import { LayoutDashboard, ShoppingBag, Store, Users, Car, Bike, CreditCard, Settings, LogOut, Building2, BarChart3 } from "lucide-react";
 import { logoutMerchant } from "@/lib/actions";
 import { Avatar } from "@/components/ui/Avatar";
 
@@ -13,6 +13,7 @@ const navItems = [
 ];
 
 const adminItems = [
+  { href: "/dashboard/analytics", label: "Analytics", icon: BarChart3 },
   { href: "/dashboard/stores", label: "Stores", icon: Building2 },
   { href: "/dashboard/drivers", label: "Drivers", icon: Car },
   { href: "/dashboard/riders", label: "Riders", icon: Bike },
