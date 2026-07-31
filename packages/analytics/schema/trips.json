@@ -1,0 +1,31 @@
+[
+  { "name": "event_id", "type": "STRING", "mode": "REQUIRED", "description": "Idempotency key for the event" },
+  { "name": "ride_id", "type": "STRING", "mode": "REQUIRED", "description": "Ride.id in the operational database" },
+  { "name": "occurred_at", "type": "TIMESTAMP", "mode": "REQUIRED", "description": "When the trip reached its terminal state; the partitioning column" },
+  { "name": "status", "type": "STRING", "mode": "REQUIRED", "description": "COMPLETED | CANCELLED" },
+  { "name": "vehicle_type", "type": "STRING", "mode": "NULLABLE" },
+  { "name": "payment_method", "type": "STRING", "mode": "NULLABLE" },
+
+  { "name": "pickup_lat", "type": "FLOAT", "mode": "NULLABLE" },
+  { "name": "pickup_lng", "type": "FLOAT", "mode": "NULLABLE" },
+  { "name": "dropoff_lat", "type": "FLOAT", "mode": "NULLABLE" },
+  { "name": "dropoff_lng", "type": "FLOAT", "mode": "NULLABLE" },
+  { "name": "pickup_area", "type": "STRING", "mode": "NULLABLE", "description": "Coarse suburb/township label; the clustering column" },
+  { "name": "dropoff_area", "type": "STRING", "mode": "NULLABLE" },
+
+  { "name": "distance_km", "type": "FLOAT", "mode": "NULLABLE" },
+  { "name": "estimated_duration_minutes", "type": "INTEGER", "mode": "NULLABLE", "description": "Maps ETA at booking time — the ETA model's baseline" },
+  { "name": "actual_duration_minutes", "type": "INTEGER", "mode": "NULLABLE", "description": "Observed trip duration — the ETA model's training target" },
+
+  { "name": "fare_estimate", "type": "NUMERIC", "mode": "NULLABLE" },
+  { "name": "fare_actual", "type": "NUMERIC", "mode": "NULLABLE" },
+  { "name": "driver_earnings", "type": "NUMERIC", "mode": "NULLABLE" },
+  { "name": "platform_fee", "type": "NUMERIC", "mode": "NULLABLE" },
+
+  { "name": "customer_key", "type": "STRING", "mode": "NULLABLE", "description": "Salted SHA-256 of the customer id — never the raw id" },
+  { "name": "driver_key", "type": "STRING", "mode": "NULLABLE", "description": "Salted SHA-256 of the driver id — never the raw id" },
+
+  { "name": "cancel_reason", "type": "STRING", "mode": "NULLABLE" },
+  { "name": "requested_at", "type": "TIMESTAMP", "mode": "NULLABLE" },
+  { "name": "accepted_at", "type": "TIMESTAMP", "mode": "NULLABLE" }
+]

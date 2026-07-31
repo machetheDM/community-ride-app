@@ -14,7 +14,10 @@
     "test:e2e": "jest --config jest.e2e.config.mjs"
   },
   "dependencies": {
+    "@ride/analytics": "*",
     "@ride/db": "*",
+    "@ride/maps-service": "*",
+    "@ride/push-service": "*",
     "@ride/types": "*",
     "jsonwebtoken": "^9.0.3",
     "lucide-react": "^1.11.0",

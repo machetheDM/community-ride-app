@@ -1,25 +1,19 @@
-interface PushMessage {
-  to: string;
-  title: string;
-  body: string;
-  data?: Record<string, unknown>;
-  sound?: "default" | null;
-}
+import { sendPushToUser as sendOne } from "@ride/push-service";
 
-export async function sendPushToUser(
+/**
+ * Order notifications from the merchant portal.
+ *
+ * Delegates to the shared transport rather than keeping a local copy. The previous
+ * implementation required tokens to start with `ExponentPushToken[` and returned
+ * silently otherwise — harmless while every token came from Expo, but the moment
+ * FCM tokens exist it would have dropped those notifications without a trace while
+ * the action still reported success.
+ */
+export function sendPushToUser(
   pushToken: string | null | undefined,
   title: string,
   body: string,
   data?: Record<string, unknown>
-) {
-  if (!pushToken?.startsWith("ExponentPushToken[")) return;
-  try {
-    await fetch("https://exp.host/--/api/v2/push/send", {
-      method: "POST",
-      headers: { "Content-Type": "application/json", Accept: "application/json" },
-      body: JSON.stringify([{ to: pushToken, title, body, data, sound: "default" } satisfies PushMessage]),
-    });
-  } catch {
-    console.error("[merchant-portal] push send failed");
-  }
+): Promise<number> {
+  return sendOne(pushToken, title, body, data);
 }

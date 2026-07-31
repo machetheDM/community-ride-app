@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getAuthUser } from "@/lib/auth";
 import { sendPushToUser } from "@/lib/notifications";
+import { emitTripEvent } from "@/lib/analytics";
 
 const RIDE_STATUS_MESSAGES: Record<string, { title: string; body: string }> = {
   ACCEPTED:       { title: "Driver found! 🚗", body: "A driver accepted your ride and is on the way." },
@@ -73,7 +74,7 @@ export async function PATCH(
     const ride = await prisma.ride.update({
       where: { id },
       data,
-      include: { customer: { select: { id: true, fcmToken: true } }, driver: true },
+      include: { customer: { select: { id: true, pushToken: true } }, driver: true },
     });
 
     // Credit the driver's completed-rides counter.
@@ -84,10 +85,16 @@ export async function PATCH(
       });
     }
 
+    // Stream the terminal state to BigQuery. Synchronous call, fire-and-forget
+    // internally — a failed analytics write must never fail a completed trip.
+    if (status === "COMPLETED" || status === "CANCELLED") {
+      emitTripEvent(ride);
+    }
+
     // Notify the customer of the status change.
     const msg = RIDE_STATUS_MESSAGES[status as string];
-    if (msg && ride.customer.fcmToken) {
-      await sendPushToUser(ride.customer.fcmToken, msg.title, msg.body, {
+    if (msg && ride.customer.pushToken) {
+      await sendPushToUser(ride.customer.pushToken, msg.title, msg.body, {
         rideId: ride.id,
         screen: "ride",
       });
