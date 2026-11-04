@@ -72,3 +72,37 @@ export function requireRole(req: NextRequest, ...roles: string[]): AuthPayload {
 export function optionalAuth(req: NextRequest): AuthPayload | null {
   return getAuthUser(req);
 }
+
+/** The caller as the database knows them right now, not as their token remembers. */
+export interface ActiveUser {
+  userId: string;
+  phone: string;
+  role: UserRoleName;
+}
+
+export type UserRoleName = "CUSTOMER" | "DRIVER" | "RIDER" | "MERCHANT" | "ADMIN";
+
+/**
+ * Verifies the token, then checks the account is still active and the token has
+ * not been revoked, and returns the role from the database.
+ *
+ * The token's own role claim is never trusted for a decision: a token lives 30
+ * days, and a driver suspended this morning must not keep accepting rides until
+ * it expires. Use this, not `requireAuth`, in every route that reads or changes
+ * someone's data. One indexed primary-key read per request is the cost.
+ */
+export async function requireActiveUser(req: NextRequest, ...roles: UserRoleName[]): Promise<ActiveUser> {
+  const token = requireAuth(req) as AuthPayload & { tokenVersion?: number };
+  const { prisma } = await import("./prisma");
+  const user = await prisma.user.findUnique({
+    where: { id: token.userId },
+    select: { id: true, phone: true, role: true, isActive: true, tokenVersion: true },
+  });
+  if (!user || !user.isActive || user.tokenVersion !== (token.tokenVersion ?? 0)) {
+    throw new AuthenticationError();
+  }
+  if (roles.length > 0 && !roles.includes(user.role)) {
+    throw new AuthorizationError(`This action requires one of these roles: ${roles.join(", ")}`);
+  }
+  return { userId: user.id, phone: user.phone, role: user.role };
+}
