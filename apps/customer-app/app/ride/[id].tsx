@@ -5,7 +5,9 @@ import {
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useLocalSearchParams, useRouter } from "expo-router";
+import { RouteMap } from "@ride/maps-service/native";
 import { useAuth } from "@/context/AuthContext";
+import { useMapsClient } from "@/hooks/useMapsClient";
 import { API_URL } from "@/constants/api";
 
 const STAGES = ["REQUESTED", "ACCEPTED", "DRIVER_ARRIVED", "IN_PROGRESS", "COMPLETED"];
@@ -20,12 +22,24 @@ const STAGE_META: Record<string, { label: string; sub: string; icon: string }> =
 };
 
 interface Vehicle { make: string; model: string; color: string; licensePlate: string }
-interface RideDriver { user: { name: string; phone: string }; vehicle: Vehicle | null }
+interface RideDriver {
+  user: { name: string; phone: string };
+  vehicle: Vehicle | null;
+  /** Driver's last reported position, used to show them moving on the map. */
+  currentLat: number | null;
+  currentLng: number | null;
+}
 interface Ride {
   id: string;
   status: string;
   pickupAddress: string;
   dropoffAddress: string;
+  pickupLat: number;
+  pickupLng: number;
+  dropoffLat: number;
+  dropoffLng: number;
+  distanceKm: number;
+  durationMinutes: number | null;
   fareEstimate: number;
   fareActual: number | null;
   vehicleType: string;
@@ -37,10 +51,13 @@ export default function RideDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
   const { token } = useAuth();
+  const mapsClient = useMapsClient();
   const [ride, setRide] = useState<Ride | null>(null);
   const [loading, setLoading] = useState(true);
   const [cancelling, setCancelling] = useState(false);
+  const [polyline, setPolyline] = useState<string | null>(null);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const routeFetchedFor = useRef<string | null>(null);
 
   const fetchRide = useCallback(async () => {
     try {
@@ -63,6 +80,30 @@ export default function RideDetailScreen() {
       clearInterval(pollRef.current);
     }
   }, [ride?.status]);
+
+  /**
+   * Fetches the route geometry exactly once per ride.
+   *
+   * The screen polls every 5 seconds; without the `routeFetchedFor` guard this
+   * would bill a Routes call on every poll — around 720 an hour for one open ride,
+   * which would burn the entire 10,000/month free tier in half a day. The road
+   * between pickup and dropoff does not change while the ride is in progress, so
+   * one fetch is correct as well as cheap.
+   */
+  useEffect(() => {
+    if (!ride || routeFetchedFor.current === ride.id) return;
+    if (!ride.pickupLat || !ride.dropoffLat) return;
+
+    routeFetchedFor.current = ride.id;
+    mapsClient
+      .route(
+        { lat: ride.pickupLat, lng: ride.pickupLng },
+        { lat: ride.dropoffLat, lng: ride.dropoffLng }
+      )
+      .then((r) => setPolyline(r.polyline))
+      // Cosmetic only — the map falls back to a straight line between the pins.
+      .catch(() => setPolyline(null));
+  }, [ride, mapsClient]);
 
   const cancelRide = () => {
     Alert.alert("Cancel ride?", "Are you sure you want to cancel this ride?", [
@@ -116,6 +157,22 @@ export default function RideDetailScreen() {
   return (
     <SafeAreaView style={styles.container}>
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 40 }}>
+        {/* Live route. Hidden once the ride is over — a finished trip does not need
+            a tracking map, and the driver marker would be stale. */}
+        {ride.pickupLat && ride.dropoffLat && !isCancelled && ride.status !== "COMPLETED" ? (
+          <RouteMap
+            style={styles.map}
+            pickup={{ lat: ride.pickupLat, lng: ride.pickupLng }}
+            dropoff={{ lat: ride.dropoffLat, lng: ride.dropoffLng }}
+            polyline={polyline}
+            driver={
+              ride.driver?.currentLat != null && ride.driver?.currentLng != null
+                ? { lat: ride.driver.currentLat, lng: ride.driver.currentLng }
+                : null
+            }
+          />
+        ) : null}
+
         {/* Status hero */}
         <View style={[styles.hero, isCancelled && styles.heroCancelled]}>
           <View style={[styles.heroIcon, isCancelled && { backgroundColor: "#ef444420", borderColor: "#ef444450" }]}>
@@ -209,6 +266,17 @@ export default function RideDetailScreen() {
             <Text style={styles.fareSub}>Vehicle</Text>
             <Text style={styles.fareSub}>{ride.vehicleType}</Text>
           </View>
+          {/* Real routed figures. Rendered only when present, so an older ride
+              booked before routing existed shows nothing rather than "0 km". */}
+          {ride.distanceKm > 0 ? (
+            <View style={styles.fareRow}>
+              <Text style={styles.fareSub}>Trip</Text>
+              <Text style={styles.fareSub}>
+                {ride.distanceKm.toFixed(1)} km
+                {ride.durationMinutes ? ` · ${ride.durationMinutes} min` : ""}
+              </Text>
+            </View>
+          ) : null}
         </View>
 
         {/* Actions */}
@@ -231,6 +299,7 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: "#0f172a" },
   loader: { flex: 1, alignItems: "center", justifyContent: "center", gap: 16 },
   errorText: { fontSize: 16, color: "#475569" },
+  map: { height: 220, marginHorizontal: 20, marginTop: 16, borderRadius: 16 },
   hero: { alignItems: "center", paddingVertical: 28, gap: 8 },
   heroCancelled: {},
   heroIcon: {

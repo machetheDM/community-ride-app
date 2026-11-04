@@ -1,0 +1,30 @@
+{
+  "name": "@ride/maps-service",
+  "version": "0.1.0",
+  "private": true,
+  "exports": {
+    ".": "./src/index.ts",
+    "./client": "./src/client.ts",
+    "./native": "./src/native/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@ride/types": "*"
+  },
+  "peerDependencies": {
+    "react": "*",
+    "react-native": "*",
+    "react-native-maps": "*"
+  },
+  "peerDependenciesMeta": {
+    "react": { "optional": true },
+    "react-native": { "optional": true },
+    "react-native-maps": { "optional": true }
+  },
+  "devDependencies": {
+    "@types/node": "^20",
+    "typescript": "^5.8.0"
+  }
+}

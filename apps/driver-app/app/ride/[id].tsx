@@ -1,11 +1,13 @@
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useRef } from "react";
 import {
   View, Text, StyleSheet, TouchableOpacity, SafeAreaView,
-  ActivityIndicator, Alert, Linking, ScrollView,
+  ActivityIndicator, Alert, Linking, ScrollView, Platform,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useLocalSearchParams, useRouter } from "expo-router";
+import { RouteMap } from "@ride/maps-service/native";
 import { useAuth } from "@/context/AuthContext";
+import { useMapsClient } from "@/hooks/useMapsClient";
 import { API_URL } from "@/constants/api";
 
 // Maps the current status to the next action a driver can take.
@@ -30,6 +32,12 @@ interface Ride {
   status: string;
   pickupAddress: string;
   dropoffAddress: string;
+  pickupLat: number;
+  pickupLng: number;
+  dropoffLat: number;
+  dropoffLng: number;
+  distanceKm: number;
+  durationMinutes: number | null;
   fareEstimate: number;
   fareActual: number | null;
   vehicleType: string;
@@ -37,13 +45,38 @@ interface Ride {
   customer: { name: string; phone: string };
 }
 
+/**
+ * Hands off to the device's own navigation app.
+ *
+ * Turn-by-turn guidance is not something to rebuild inside this app, and opening
+ * Google Maps this way is a URL scheme rather than an API call — it consumes no
+ * Maps Platform quota and costs nothing.
+ */
+function openNavigation(lat: number, lng: number, label: string) {
+  const url = Platform.select({
+    ios: `maps://app?daddr=${lat},${lng}&dirflg=d`,
+    android: `google.navigation:q=${lat},${lng}`,
+    default: `https://www.google.com/maps/dir/?api=1&destination=${lat},${lng}`,
+  });
+
+  Linking.openURL(url as string).catch(() => {
+    // Navigation app missing or the scheme is blocked — fall back to the web map.
+    Linking.openURL(
+      `https://www.google.com/maps/dir/?api=1&destination=${lat},${lng}`
+    ).catch(() => Alert.alert("Could not open navigation", `Head to ${label}.`));
+  });
+}
+
 export default function DriverRideScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
   const { token } = useAuth();
+  const mapsClient = useMapsClient();
   const [ride, setRide] = useState<Ride | null>(null);
   const [loading, setLoading] = useState(true);
   const [updating, setUpdating] = useState(false);
+  const [polyline, setPolyline] = useState<string | null>(null);
+  const routeFetchedFor = useRef<string | null>(null);
 
   const authHeaders = token ? { Authorization: `Bearer ${token}` } : undefined;
 
@@ -58,6 +91,22 @@ export default function DriverRideScreen() {
   }, [id]);
 
   useEffect(() => { fetchRide(); }, [fetchRide]);
+
+  // One Routes call per ride, never per refresh — the road does not change mid-trip
+  // and each call is billable.
+  useEffect(() => {
+    if (!ride || routeFetchedFor.current === ride.id) return;
+    if (!ride.pickupLat || !ride.dropoffLat) return;
+
+    routeFetchedFor.current = ride.id;
+    mapsClient
+      .route(
+        { lat: ride.pickupLat, lng: ride.pickupLng },
+        { lat: ride.dropoffLat, lng: ride.dropoffLng }
+      )
+      .then((r) => setPolyline(r.polyline))
+      .catch(() => setPolyline(null));
+  }, [ride, mapsClient]);
 
   const advance = async () => {
     if (!ride) return;
@@ -120,6 +169,34 @@ export default function DriverRideScreen() {
           <Text style={styles.statusText}>{STATUS_LABEL[ride.status] ?? ride.status}</Text>
         </View>
 
+        {/* Navigation view */}
+        {ride.pickupLat && ride.dropoffLat && !isDone ? (
+          <>
+            <RouteMap
+              style={styles.map}
+              pickup={{ lat: ride.pickupLat, lng: ride.pickupLng }}
+              dropoff={{ lat: ride.dropoffLat, lng: ride.dropoffLng }}
+              polyline={polyline}
+            />
+            {/* Before the trip starts the driver is heading to the customer; after
+                it starts, to the destination. */}
+            <TouchableOpacity
+              style={styles.navBtn}
+              onPress={() =>
+                ride.status === "IN_PROGRESS"
+                  ? openNavigation(ride.dropoffLat, ride.dropoffLng, ride.dropoffAddress)
+                  : openNavigation(ride.pickupLat, ride.pickupLng, ride.pickupAddress)
+              }
+              activeOpacity={0.85}
+            >
+              <Ionicons name="navigate" size={18} color="#0f172a" />
+              <Text style={styles.navBtnText}>
+                {ride.status === "IN_PROGRESS" ? "Navigate to dropoff" : "Navigate to pickup"}
+              </Text>
+            </TouchableOpacity>
+          </>
+        ) : null}
+
         {/* Customer */}
         <View style={styles.card}>
           <Text style={styles.cardTitle}>Customer</Text>
@@ -166,6 +243,15 @@ export default function DriverRideScreen() {
             <Text style={styles.fareSub}>Payment</Text>
             <Text style={styles.fareSub}>{ride.paymentMethod}</Text>
           </View>
+          {ride.distanceKm > 0 ? (
+            <View style={styles.fareRow}>
+              <Text style={styles.fareSub}>Trip</Text>
+              <Text style={styles.fareSub}>
+                {ride.distanceKm.toFixed(1)} km
+                {ride.durationMinutes ? ` · ${ride.durationMinutes} min` : ""}
+              </Text>
+            </View>
+          ) : null}
         </View>
       </ScrollView>
 
@@ -187,6 +273,13 @@ export default function DriverRideScreen() {
 }
 
 const styles = StyleSheet.create({
+  map: { height: 240, marginHorizontal: 20, marginTop: 14, borderRadius: 16 },
+  navBtn: {
+    flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8,
+    marginHorizontal: 20, marginTop: 12, marginBottom: 2,
+    backgroundColor: "#22c55e", borderRadius: 14, paddingVertical: 14,
+  },
+  navBtnText: { fontSize: 15, fontWeight: "800", color: "#0f172a" },
   container: { flex: 1, backgroundColor: "#0f172a" },
   loader: { flex: 1, alignItems: "center", justifyContent: "center", gap: 16 },
   errorText: { fontSize: 16, color: "#475569" },
