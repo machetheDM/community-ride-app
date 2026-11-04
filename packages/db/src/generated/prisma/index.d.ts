@@ -3310,7 +3310,8 @@ export namespace Prisma {
     isVerified: boolean | null
     isActive: boolean | null
     walletBalance: Decimal | null
-    fcmToken: string | null
+    pushToken: string | null
+    pushProvider: string | null
     createdAt: Date | null
     updatedAt: Date | null
   }
@@ -3325,7 +3326,8 @@ export namespace Prisma {
     isVerified: boolean | null
     isActive: boolean | null
     walletBalance: Decimal | null
-    fcmToken: string | null
+    pushToken: string | null
+    pushProvider: string | null
     createdAt: Date | null
     updatedAt: Date | null
   }
@@ -3340,7 +3342,8 @@ export namespace Prisma {
     isVerified: number
     isActive: number
     walletBalance: number
-    fcmToken: number
+    pushToken: number
+    pushProvider: number
     createdAt: number
     updatedAt: number
     _all: number
@@ -3365,7 +3368,8 @@ export namespace Prisma {
     isVerified?: true
     isActive?: true
     walletBalance?: true
-    fcmToken?: true
+    pushToken?: true
+    pushProvider?: true
     createdAt?: true
     updatedAt?: true
   }
@@ -3380,7 +3384,8 @@ export namespace Prisma {
     isVerified?: true
     isActive?: true
     walletBalance?: true
-    fcmToken?: true
+    pushToken?: true
+    pushProvider?: true
     createdAt?: true
     updatedAt?: true
   }
@@ -3395,7 +3400,8 @@ export namespace Prisma {
     isVerified?: true
     isActive?: true
     walletBalance?: true
-    fcmToken?: true
+    pushToken?: true
+    pushProvider?: true
     createdAt?: true
     updatedAt?: true
     _all?: true
@@ -3497,7 +3503,8 @@ export namespace Prisma {
     isVerified: boolean
     isActive: boolean
     walletBalance: Decimal
-    fcmToken: string | null
+    pushToken: string | null
+    pushProvider: string
     createdAt: Date
     updatedAt: Date
     _count: UserCountAggregateOutputType | null
@@ -3531,7 +3538,8 @@ export namespace Prisma {
     isVerified?: boolean
     isActive?: boolean
     walletBalance?: boolean
-    fcmToken?: boolean
+    pushToken?: boolean
+    pushProvider?: boolean
     createdAt?: boolean
     updatedAt?: boolean
     driverProfile?: boolean | User$driverProfileArgs<ExtArgs>
@@ -3556,7 +3564,8 @@ export namespace Prisma {
     isVerified?: boolean
     isActive?: boolean
     walletBalance?: boolean
-    fcmToken?: boolean
+    pushToken?: boolean
+    pushProvider?: boolean
     createdAt?: boolean
     updatedAt?: boolean
   }, ExtArgs["result"]["user"]>
@@ -3571,7 +3580,8 @@ export namespace Prisma {
     isVerified?: boolean
     isActive?: boolean
     walletBalance?: boolean
-    fcmToken?: boolean
+    pushToken?: boolean
+    pushProvider?: boolean
     createdAt?: boolean
     updatedAt?: boolean
   }, ExtArgs["result"]["user"]>
@@ -3586,12 +3596,13 @@ export namespace Prisma {
     isVerified?: boolean
     isActive?: boolean
     walletBalance?: boolean
-    fcmToken?: boolean
+    pushToken?: boolean
+    pushProvider?: boolean
     createdAt?: boolean
     updatedAt?: boolean
   }
 
-  export type UserOmit<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetOmit<"id" | "phone" | "email" | "name" | "avatar" | "role" | "isVerified" | "isActive" | "walletBalance" | "fcmToken" | "createdAt" | "updatedAt", ExtArgs["result"]["user"]>
+  export type UserOmit<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetOmit<"id" | "phone" | "email" | "name" | "avatar" | "role" | "isVerified" | "isActive" | "walletBalance" | "pushToken" | "pushProvider" | "createdAt" | "updatedAt", ExtArgs["result"]["user"]>
   export type UserInclude<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
     driverProfile?: boolean | User$driverProfileArgs<ExtArgs>
     riderProfile?: boolean | User$riderProfileArgs<ExtArgs>
@@ -3630,7 +3641,8 @@ export namespace Prisma {
       isVerified: boolean
       isActive: boolean
       walletBalance: Prisma.Decimal
-      fcmToken: string | null
+      pushToken: string | null
+      pushProvider: string
       createdAt: Date
       updatedAt: Date
     }, ExtArgs["result"]["user"]>
@@ -4074,7 +4086,8 @@ export namespace Prisma {
     readonly isVerified: FieldRef<"User", 'Boolean'>
     readonly isActive: FieldRef<"User", 'Boolean'>
     readonly walletBalance: FieldRef<"User", 'Decimal'>
-    readonly fcmToken: FieldRef<"User", 'String'>
+    readonly pushToken: FieldRef<"User", 'String'>
+    readonly pushProvider: FieldRef<"User", 'String'>
     readonly createdAt: FieldRef<"User", 'DateTime'>
     readonly updatedAt: FieldRef<"User", 'DateTime'>
   }
@@ -29837,7 +29850,8 @@ export namespace Prisma {
     isVerified: 'isVerified',
     isActive: 'isActive',
     walletBalance: 'walletBalance',
-    fcmToken: 'fcmToken',
+    pushToken: 'pushToken',
+    pushProvider: 'pushProvider',
     createdAt: 'createdAt',
     updatedAt: 'updatedAt'
   };
@@ -30435,7 +30449,8 @@ export namespace Prisma {
     isVerified?: BoolFilter<"User"> | boolean
     isActive?: BoolFilter<"User"> | boolean
     walletBalance?: DecimalFilter<"User"> | Decimal | DecimalJsLike | number | string
-    fcmToken?: StringNullableFilter<"User"> | string | null
+    pushToken?: StringNullableFilter<"User"> | string | null
+    pushProvider?: StringFilter<"User"> | string
     createdAt?: DateTimeFilter<"User"> | Date | string
     updatedAt?: DateTimeFilter<"User"> | Date | string
     driverProfile?: XOR<DriverNullableScalarRelationFilter, DriverWhereInput> | null
@@ -30459,7 +30474,8 @@ export namespace Prisma {
     isVerified?: SortOrder
     isActive?: SortOrder
     walletBalance?: SortOrder
-    fcmToken?: SortOrderInput | SortOrder
+    pushToken?: SortOrderInput | SortOrder
+    pushProvider?: SortOrder
     createdAt?: SortOrder
     updatedAt?: SortOrder
     driverProfile?: DriverOrderByWithRelationInput
@@ -30486,7 +30502,8 @@ export namespace Prisma {
     isVerified?: BoolFilter<"User"> | boolean
     isActive?: BoolFilter<"User"> | boolean
     walletBalance?: DecimalFilter<"User"> | Decimal | DecimalJsLike | number | string
-    fcmToken?: StringNullableFilter<"User"> | string | null
+    pushToken?: StringNullableFilter<"User"> | string | null
+    pushProvider?: StringFilter<"User"> | string
     createdAt?: DateTimeFilter<"User"> | Date | string
     updatedAt?: DateTimeFilter<"User"> | Date | string
     driverProfile?: XOR<DriverNullableScalarRelationFilter, DriverWhereInput> | null
@@ -30510,7 +30527,8 @@ export namespace Prisma {
     isVerified?: SortOrder
     isActive?: SortOrder
     walletBalance?: SortOrder
-    fcmToken?: SortOrderInput | SortOrder
+    pushToken?: SortOrderInput | SortOrder
+    pushProvider?: SortOrder
     createdAt?: SortOrder
     updatedAt?: SortOrder
     _count?: UserCountOrderByAggregateInput
@@ -30533,7 +30551,8 @@ export namespace Prisma {
     isVerified?: BoolWithAggregatesFilter<"User"> | boolean
     isActive?: BoolWithAggregatesFilter<"User"> | boolean
     walletBalance?: DecimalWithAggregatesFilter<"User"> | Decimal | DecimalJsLike | number | string
-    fcmToken?: StringNullableWithAggregatesFilter<"User"> | string | null
+    pushToken?: StringNullableWithAggregatesFilter<"User"> | string | null
+    pushProvider?: StringWithAggregatesFilter<"User"> | string
     createdAt?: DateTimeWithAggregatesFilter<"User"> | Date | string
     updatedAt?: DateTimeWithAggregatesFilter<"User"> | Date | string
   }
@@ -32373,7 +32392,8 @@ export namespace Prisma {
     isVerified?: boolean
     isActive?: boolean
     walletBalance?: Decimal | DecimalJsLike | number | string
-    fcmToken?: string | null
+    pushToken?: string | null
+    pushProvider?: string
     createdAt?: Date | string
     updatedAt?: Date | string
     driverProfile?: DriverCreateNestedOneWithoutUserInput
@@ -32397,7 +32417,8 @@ export namespace Prisma {
     isVerified?: boolean
     isActive?: boolean
     walletBalance?: Decimal | DecimalJsLike | number | string
-    fcmToken?: string | null
+    pushToken?: string | null
+    pushProvider?: string
     createdAt?: Date | string
     updatedAt?: Date | string
     driverProfile?: DriverUncheckedCreateNestedOneWithoutUserInput
@@ -32421,7 +32442,8 @@ export namespace Prisma {
     isVerified?: BoolFieldUpdateOperationsInput | boolean
     isActive?: BoolFieldUpdateOperationsInput | boolean
     walletBalance?: DecimalFieldUpdateOperationsInput | Decimal | DecimalJsLike | number | string
-    fcmToken?: NullableStringFieldUpdateOperationsInput | string | null
+    pushToken?: NullableStringFieldUpdateOperationsInput | string | null
+    pushProvider?: StringFieldUpdateOperationsInput | string
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     driverProfile?: DriverUpdateOneWithoutUserNestedInput
@@ -32445,7 +32467,8 @@ export namespace Prisma {
     isVerified?: BoolFieldUpdateOperationsInput | boolean
     isActive?: BoolFieldUpdateOperationsInput | boolean
     walletBalance?: DecimalFieldUpdateOperationsInput | Decimal | DecimalJsLike | number | string
-    fcmToken?: NullableStringFieldUpdateOperationsInput | string | null
+    pushToken?: NullableStringFieldUpdateOperationsInput | string | null
+    pushProvider?: StringFieldUpdateOperationsInput | string
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     driverProfile?: DriverUncheckedUpdateOneWithoutUserNestedInput
@@ -32469,7 +32492,8 @@ export namespace Prisma {
     isVerified?: boolean
     isActive?: boolean
     walletBalance?: Decimal | DecimalJsLike | number | string
-    fcmToken?: string | null
+    pushToken?: string | null
+    pushProvider?: string
     createdAt?: Date | string
     updatedAt?: Date | string
   }
@@ -32484,7 +32508,8 @@ export namespace Prisma {
     isVerified?: BoolFieldUpdateOperationsInput | boolean
     isActive?: BoolFieldUpdateOperationsInput | boolean
     walletBalance?: DecimalFieldUpdateOperationsInput | Decimal | DecimalJsLike | number | string
-    fcmToken?: NullableStringFieldUpdateOperationsInput | string | null
+    pushToken?: NullableStringFieldUpdateOperationsInput | string | null
+    pushProvider?: StringFieldUpdateOperationsInput | string
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
   }
@@ -32499,7 +32524,8 @@ export namespace Prisma {
     isVerified?: BoolFieldUpdateOperationsInput | boolean
     isActive?: BoolFieldUpdateOperationsInput | boolean
     walletBalance?: DecimalFieldUpdateOperationsInput | Decimal | DecimalJsLike | number | string
-    fcmToken?: NullableStringFieldUpdateOperationsInput | string | null
+    pushToken?: NullableStringFieldUpdateOperationsInput | string | null
+    pushProvider?: StringFieldUpdateOperationsInput | string
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
   }
@@ -34637,7 +34663,8 @@ export namespace Prisma {
     isVerified?: SortOrder
     isActive?: SortOrder
     walletBalance?: SortOrder
-    fcmToken?: SortOrder
+    pushToken?: SortOrder
+    pushProvider?: SortOrder
     createdAt?: SortOrder
     updatedAt?: SortOrder
   }
@@ -34656,7 +34683,8 @@ export namespace Prisma {
     isVerified?: SortOrder
     isActive?: SortOrder
     walletBalance?: SortOrder
-    fcmToken?: SortOrder
+    pushToken?: SortOrder
+    pushProvider?: SortOrder
     createdAt?: SortOrder
     updatedAt?: SortOrder
   }
@@ -34671,7 +34699,8 @@ export namespace Prisma {
     isVerified?: SortOrder
     isActive?: SortOrder
     walletBalance?: SortOrder
-    fcmToken?: SortOrder
+    pushToken?: SortOrder
+    pushProvider?: SortOrder
     createdAt?: SortOrder
     updatedAt?: SortOrder
   }
@@ -39127,7 +39156,8 @@ export namespace Prisma {
     isVerified?: boolean
     isActive?: boolean
     walletBalance?: Decimal | DecimalJsLike | number | string
-    fcmToken?: string | null
+    pushToken?: string | null
+    pushProvider?: string
     createdAt?: Date | string
     updatedAt?: Date | string
     riderProfile?: RiderCreateNestedOneWithoutUserInput
@@ -39150,7 +39180,8 @@ export namespace Prisma {
     isVerified?: boolean
     isActive?: boolean
     walletBalance?: Decimal | DecimalJsLike | number | string
-    fcmToken?: string | null
+    pushToken?: string | null
+    pushProvider?: string
     createdAt?: Date | string
     updatedAt?: Date | string
     riderProfile?: RiderUncheckedCreateNestedOneWithoutUserInput
@@ -39318,7 +39349,8 @@ export namespace Prisma {
     isVerified?: BoolFieldUpdateOperationsInput | boolean
     isActive?: BoolFieldUpdateOperationsInput | boolean
     walletBalance?: DecimalFieldUpdateOperationsInput | Decimal | DecimalJsLike | number | string
-    fcmToken?: NullableStringFieldUpdateOperationsInput | string | null
+    pushToken?: NullableStringFieldUpdateOperationsInput | string | null
+    pushProvider?: StringFieldUpdateOperationsInput | string
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     riderProfile?: RiderUpdateOneWithoutUserNestedInput
@@ -39341,7 +39373,8 @@ export namespace Prisma {
     isVerified?: BoolFieldUpdateOperationsInput | boolean
     isActive?: BoolFieldUpdateOperationsInput | boolean
     walletBalance?: DecimalFieldUpdateOperationsInput | Decimal | DecimalJsLike | number | string
-    fcmToken?: NullableStringFieldUpdateOperationsInput | string | null
+    pushToken?: NullableStringFieldUpdateOperationsInput | string | null
+    pushProvider?: StringFieldUpdateOperationsInput | string
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     riderProfile?: RiderUncheckedUpdateOneWithoutUserNestedInput
@@ -39448,7 +39481,8 @@ export namespace Prisma {
     isVerified?: boolean
     isActive?: boolean
     walletBalance?: Decimal | DecimalJsLike | number | string
-    fcmToken?: string | null
+    pushToken?: string | null
+    pushProvider?: string
     createdAt?: Date | string
     updatedAt?: Date | string
     driverProfile?: DriverCreateNestedOneWithoutUserInput
@@ -39471,7 +39505,8 @@ export namespace Prisma {
     isVerified?: boolean
     isActive?: boolean
     walletBalance?: Decimal | DecimalJsLike | number | string
-    fcmToken?: string | null
+    pushToken?: string | null
+    pushProvider?: string
     createdAt?: Date | string
     updatedAt?: Date | string
     driverProfile?: DriverUncheckedCreateNestedOneWithoutUserInput
@@ -39611,7 +39646,8 @@ export namespace Prisma {
     isVerified?: BoolFieldUpdateOperationsInput | boolean
     isActive?: BoolFieldUpdateOperationsInput | boolean
     walletBalance?: DecimalFieldUpdateOperationsInput | Decimal | DecimalJsLike | number | string
-    fcmToken?: NullableStringFieldUpdateOperationsInput | string | null
+    pushToken?: NullableStringFieldUpdateOperationsInput | string | null
+    pushProvider?: StringFieldUpdateOperationsInput | string
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     driverProfile?: DriverUpdateOneWithoutUserNestedInput
@@ -39634,7 +39670,8 @@ export namespace Prisma {
     isVerified?: BoolFieldUpdateOperationsInput | boolean
     isActive?: BoolFieldUpdateOperationsInput | boolean
     walletBalance?: DecimalFieldUpdateOperationsInput | Decimal | DecimalJsLike | number | string
-    fcmToken?: NullableStringFieldUpdateOperationsInput | string | null
+    pushToken?: NullableStringFieldUpdateOperationsInput | string | null
+    pushProvider?: StringFieldUpdateOperationsInput | string
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     driverProfile?: DriverUncheckedUpdateOneWithoutUserNestedInput
@@ -39927,7 +39964,8 @@ export namespace Prisma {
     isVerified?: boolean
     isActive?: boolean
     walletBalance?: Decimal | DecimalJsLike | number | string
-    fcmToken?: string | null
+    pushToken?: string | null
+    pushProvider?: string
     createdAt?: Date | string
     updatedAt?: Date | string
     driverProfile?: DriverCreateNestedOneWithoutUserInput
@@ -39950,7 +39988,8 @@ export namespace Prisma {
     isVerified?: boolean
     isActive?: boolean
     walletBalance?: Decimal | DecimalJsLike | number | string
-    fcmToken?: string | null
+    pushToken?: string | null
+    pushProvider?: string
     createdAt?: Date | string
     updatedAt?: Date | string
     driverProfile?: DriverUncheckedCreateNestedOneWithoutUserInput
@@ -40135,7 +40174,8 @@ export namespace Prisma {
     isVerified?: BoolFieldUpdateOperationsInput | boolean
     isActive?: BoolFieldUpdateOperationsInput | boolean
     walletBalance?: DecimalFieldUpdateOperationsInput | Decimal | DecimalJsLike | number | string
-    fcmToken?: NullableStringFieldUpdateOperationsInput | string | null
+    pushToken?: NullableStringFieldUpdateOperationsInput | string | null
+    pushProvider?: StringFieldUpdateOperationsInput | string
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     driverProfile?: DriverUpdateOneWithoutUserNestedInput
@@ -40158,7 +40198,8 @@ export namespace Prisma {
     isVerified?: BoolFieldUpdateOperationsInput | boolean
     isActive?: BoolFieldUpdateOperationsInput | boolean
     walletBalance?: DecimalFieldUpdateOperationsInput | Decimal | DecimalJsLike | number | string
-    fcmToken?: NullableStringFieldUpdateOperationsInput | string | null
+    pushToken?: NullableStringFieldUpdateOperationsInput | string | null
+    pushProvider?: StringFieldUpdateOperationsInput | string
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     driverProfile?: DriverUncheckedUpdateOneWithoutUserNestedInput
@@ -40485,7 +40526,8 @@ export namespace Prisma {
     isVerified?: boolean
     isActive?: boolean
     walletBalance?: Decimal | DecimalJsLike | number | string
-    fcmToken?: string | null
+    pushToken?: string | null
+    pushProvider?: string
     createdAt?: Date | string
     updatedAt?: Date | string
     driverProfile?: DriverCreateNestedOneWithoutUserInput
@@ -40508,7 +40550,8 @@ export namespace Prisma {
     isVerified?: boolean
     isActive?: boolean
     walletBalance?: Decimal | DecimalJsLike | number | string
-    fcmToken?: string | null
+    pushToken?: string | null
+    pushProvider?: string
     createdAt?: Date | string
     updatedAt?: Date | string
     driverProfile?: DriverUncheckedCreateNestedOneWithoutUserInput
@@ -40605,7 +40648,8 @@ export namespace Prisma {
     isVerified?: BoolFieldUpdateOperationsInput | boolean
     isActive?: BoolFieldUpdateOperationsInput | boolean
     walletBalance?: DecimalFieldUpdateOperationsInput | Decimal | DecimalJsLike | number | string
-    fcmToken?: NullableStringFieldUpdateOperationsInput | string | null
+    pushToken?: NullableStringFieldUpdateOperationsInput | string | null
+    pushProvider?: StringFieldUpdateOperationsInput | string
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     driverProfile?: DriverUpdateOneWithoutUserNestedInput
@@ -40628,7 +40672,8 @@ export namespace Prisma {
     isVerified?: BoolFieldUpdateOperationsInput | boolean
     isActive?: BoolFieldUpdateOperationsInput | boolean
     walletBalance?: DecimalFieldUpdateOperationsInput | Decimal | DecimalJsLike | number | string
-    fcmToken?: NullableStringFieldUpdateOperationsInput | string | null
+    pushToken?: NullableStringFieldUpdateOperationsInput | string | null
+    pushProvider?: StringFieldUpdateOperationsInput | string
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     driverProfile?: DriverUncheckedUpdateOneWithoutUserNestedInput
@@ -41328,7 +41373,8 @@ export namespace Prisma {
     isVerified?: boolean
     isActive?: boolean
     walletBalance?: Decimal | DecimalJsLike | number | string
-    fcmToken?: string | null
+    pushToken?: string | null
+    pushProvider?: string
     createdAt?: Date | string
     updatedAt?: Date | string
     driverProfile?: DriverCreateNestedOneWithoutUserInput
@@ -41351,7 +41397,8 @@ export namespace Prisma {
     isVerified?: boolean
     isActive?: boolean
     walletBalance?: Decimal | DecimalJsLike | number | string
-    fcmToken?: string | null
+    pushToken?: string | null
+    pushProvider?: string
     createdAt?: Date | string
     updatedAt?: Date | string
     driverProfile?: DriverUncheckedCreateNestedOneWithoutUserInput
@@ -41587,7 +41634,8 @@ export namespace Prisma {
     isVerified?: BoolFieldUpdateOperationsInput | boolean
     isActive?: BoolFieldUpdateOperationsInput | boolean
     walletBalance?: DecimalFieldUpdateOperationsInput | Decimal | DecimalJsLike | number | string
-    fcmToken?: NullableStringFieldUpdateOperationsInput | string | null
+    pushToken?: NullableStringFieldUpdateOperationsInput | string | null
+    pushProvider?: StringFieldUpdateOperationsInput | string
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     driverProfile?: DriverUpdateOneWithoutUserNestedInput
@@ -41610,7 +41658,8 @@ export namespace Prisma {
     isVerified?: BoolFieldUpdateOperationsInput | boolean
     isActive?: BoolFieldUpdateOperationsInput | boolean
     walletBalance?: DecimalFieldUpdateOperationsInput | Decimal | DecimalJsLike | number | string
-    fcmToken?: NullableStringFieldUpdateOperationsInput | string | null
+    pushToken?: NullableStringFieldUpdateOperationsInput | string | null
+    pushProvider?: StringFieldUpdateOperationsInput | string
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     driverProfile?: DriverUncheckedUpdateOneWithoutUserNestedInput
@@ -42365,7 +42414,8 @@ export namespace Prisma {
     isVerified?: boolean
     isActive?: boolean
     walletBalance?: Decimal | DecimalJsLike | number | string
-    fcmToken?: string | null
+    pushToken?: string | null
+    pushProvider?: string
     createdAt?: Date | string
     updatedAt?: Date | string
     driverProfile?: DriverCreateNestedOneWithoutUserInput
@@ -42388,7 +42438,8 @@ export namespace Prisma {
     isVerified?: boolean
     isActive?: boolean
     walletBalance?: Decimal | DecimalJsLike | number | string
-    fcmToken?: string | null
+    pushToken?: string | null
+    pushProvider?: string
     createdAt?: Date | string
     updatedAt?: Date | string
     driverProfile?: DriverUncheckedCreateNestedOneWithoutUserInput
@@ -42547,7 +42598,8 @@ export namespace Prisma {
     isVerified?: BoolFieldUpdateOperationsInput | boolean
     isActive?: BoolFieldUpdateOperationsInput | boolean
     walletBalance?: DecimalFieldUpdateOperationsInput | Decimal | DecimalJsLike | number | string
-    fcmToken?: NullableStringFieldUpdateOperationsInput | string | null
+    pushToken?: NullableStringFieldUpdateOperationsInput | string | null
+    pushProvider?: StringFieldUpdateOperationsInput | string
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     driverProfile?: DriverUpdateOneWithoutUserNestedInput
@@ -42570,7 +42622,8 @@ export namespace Prisma {
     isVerified?: BoolFieldUpdateOperationsInput | boolean
     isActive?: BoolFieldUpdateOperationsInput | boolean
     walletBalance?: DecimalFieldUpdateOperationsInput | Decimal | DecimalJsLike | number | string
-    fcmToken?: NullableStringFieldUpdateOperationsInput | string | null
+    pushToken?: NullableStringFieldUpdateOperationsInput | string | null
+    pushProvider?: StringFieldUpdateOperationsInput | string
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     driverProfile?: DriverUncheckedUpdateOneWithoutUserNestedInput
@@ -43145,7 +43198,8 @@ export namespace Prisma {
     isVerified?: boolean
     isActive?: boolean
     walletBalance?: Decimal | DecimalJsLike | number | string
-    fcmToken?: string | null
+    pushToken?: string | null
+    pushProvider?: string
     createdAt?: Date | string
     updatedAt?: Date | string
     driverProfile?: DriverCreateNestedOneWithoutUserInput
@@ -43168,7 +43222,8 @@ export namespace Prisma {
     isVerified?: boolean
     isActive?: boolean
     walletBalance?: Decimal | DecimalJsLike | number | string
-    fcmToken?: string | null
+    pushToken?: string | null
+    pushProvider?: string
     createdAt?: Date | string
     updatedAt?: Date | string
     driverProfile?: DriverUncheckedCreateNestedOneWithoutUserInput
@@ -43196,7 +43251,8 @@ export namespace Prisma {
     isVerified?: boolean
     isActive?: boolean
     walletBalance?: Decimal | DecimalJsLike | number | string
-    fcmToken?: string | null
+    pushToken?: string | null
+    pushProvider?: string
     createdAt?: Date | string
     updatedAt?: Date | string
     driverProfile?: DriverCreateNestedOneWithoutUserInput
@@ -43219,7 +43275,8 @@ export namespace Prisma {
     isVerified?: boolean
     isActive?: boolean
     walletBalance?: Decimal | DecimalJsLike | number | string
-    fcmToken?: string | null
+    pushToken?: string | null
+    pushProvider?: string
     createdAt?: Date | string
     updatedAt?: Date | string
     driverProfile?: DriverUncheckedCreateNestedOneWithoutUserInput
@@ -43378,7 +43435,8 @@ export namespace Prisma {
     isVerified?: BoolFieldUpdateOperationsInput | boolean
     isActive?: BoolFieldUpdateOperationsInput | boolean
     walletBalance?: DecimalFieldUpdateOperationsInput | Decimal | DecimalJsLike | number | string
-    fcmToken?: NullableStringFieldUpdateOperationsInput | string | null
+    pushToken?: NullableStringFieldUpdateOperationsInput | string | null
+    pushProvider?: StringFieldUpdateOperationsInput | string
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     driverProfile?: DriverUpdateOneWithoutUserNestedInput
@@ -43401,7 +43459,8 @@ export namespace Prisma {
     isVerified?: BoolFieldUpdateOperationsInput | boolean
     isActive?: BoolFieldUpdateOperationsInput | boolean
     walletBalance?: DecimalFieldUpdateOperationsInput | Decimal | DecimalJsLike | number | string
-    fcmToken?: NullableStringFieldUpdateOperationsInput | string | null
+    pushToken?: NullableStringFieldUpdateOperationsInput | string | null
+    pushProvider?: StringFieldUpdateOperationsInput | string
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     driverProfile?: DriverUncheckedUpdateOneWithoutUserNestedInput
@@ -43435,7 +43494,8 @@ export namespace Prisma {
     isVerified?: BoolFieldUpdateOperationsInput | boolean
     isActive?: BoolFieldUpdateOperationsInput | boolean
     walletBalance?: DecimalFieldUpdateOperationsInput | Decimal | DecimalJsLike | number | string
-    fcmToken?: NullableStringFieldUpdateOperationsInput | string | null
+    pushToken?: NullableStringFieldUpdateOperationsInput | string | null
+    pushProvider?: StringFieldUpdateOperationsInput | string
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     driverProfile?: DriverUpdateOneWithoutUserNestedInput
@@ -43458,7 +43518,8 @@ export namespace Prisma {
     isVerified?: BoolFieldUpdateOperationsInput | boolean
     isActive?: BoolFieldUpdateOperationsInput | boolean
     walletBalance?: DecimalFieldUpdateOperationsInput | Decimal | DecimalJsLike | number | string
-    fcmToken?: NullableStringFieldUpdateOperationsInput | string | null
+    pushToken?: NullableStringFieldUpdateOperationsInput | string | null
+    pushProvider?: StringFieldUpdateOperationsInput | string
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     driverProfile?: DriverUncheckedUpdateOneWithoutUserNestedInput
@@ -43613,7 +43674,8 @@ export namespace Prisma {
     isVerified?: boolean
     isActive?: boolean
     walletBalance?: Decimal | DecimalJsLike | number | string
-    fcmToken?: string | null
+    pushToken?: string | null
+    pushProvider?: string
     createdAt?: Date | string
     updatedAt?: Date | string
     driverProfile?: DriverCreateNestedOneWithoutUserInput
@@ -43636,7 +43698,8 @@ export namespace Prisma {
     isVerified?: boolean
     isActive?: boolean
     walletBalance?: Decimal | DecimalJsLike | number | string
-    fcmToken?: string | null
+    pushToken?: string | null
+    pushProvider?: string
     createdAt?: Date | string
     updatedAt?: Date | string
     driverProfile?: DriverUncheckedCreateNestedOneWithoutUserInput
@@ -43675,7 +43738,8 @@ export namespace Prisma {
     isVerified?: BoolFieldUpdateOperationsInput | boolean
     isActive?: BoolFieldUpdateOperationsInput | boolean
     walletBalance?: DecimalFieldUpdateOperationsInput | Decimal | DecimalJsLike | number | string
-    fcmToken?: NullableStringFieldUpdateOperationsInput | string | null
+    pushToken?: NullableStringFieldUpdateOperationsInput | string | null
+    pushProvider?: StringFieldUpdateOperationsInput | string
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     driverProfile?: DriverUpdateOneWithoutUserNestedInput
@@ -43698,7 +43762,8 @@ export namespace Prisma {
     isVerified?: BoolFieldUpdateOperationsInput | boolean
     isActive?: BoolFieldUpdateOperationsInput | boolean
     walletBalance?: DecimalFieldUpdateOperationsInput | Decimal | DecimalJsLike | number | string
-    fcmToken?: NullableStringFieldUpdateOperationsInput | string | null
+    pushToken?: NullableStringFieldUpdateOperationsInput | string | null
+    pushProvider?: StringFieldUpdateOperationsInput | string
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     driverProfile?: DriverUncheckedUpdateOneWithoutUserNestedInput

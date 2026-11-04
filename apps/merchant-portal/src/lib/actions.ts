@@ -46,7 +46,7 @@ export async function updateOrderStatus(orderId: string, status: string) {
   // Verify the order belongs to one of this merchant's stores.
   const order = await prisma.order.findFirst({
     where: { id: orderId, store: { merchantId: session.merchantId } },
-    include: { customer: { select: { fcmToken: true } } },
+    include: { customer: { select: { pushToken: true } } },
   });
   if (!order) return { error: "Order not found" };
 
@@ -62,8 +62,8 @@ export async function updateOrderStatus(orderId: string, status: string) {
   });
 
   const msg = STATUS_MESSAGES[status];
-  if (msg && order.customer.fcmToken) {
-    await sendPushToUser(order.customer.fcmToken, msg.title, msg.body, { orderId, screen: "orders" });
+  if (msg && order.customer.pushToken) {
+    await sendPushToUser(order.customer.pushToken, msg.title, msg.body, { orderId, screen: "orders" });
   }
 
   revalidatePath("/dashboard/orders");

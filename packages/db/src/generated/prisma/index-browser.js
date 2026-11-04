@@ -130,7 +130,8 @@ exports.Prisma.UserScalarFieldEnum = {
   isVerified: 'isVerified',
   isActive: 'isActive',
   walletBalance: 'walletBalance',
-  fcmToken: 'fcmToken',
+  pushToken: 'pushToken',
+  pushProvider: 'pushProvider',
   createdAt: 'createdAt',
   updatedAt: 'updatedAt'
 };

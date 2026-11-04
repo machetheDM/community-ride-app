@@ -8,6 +8,8 @@ import { withErrorHandler } from "@/lib/handler";
 import { getPagination, paginatedResponse } from "@/lib/pagination";
 import { geocodeCached, getMapsConfig, withMaps } from "@/lib/maps";
 import { calculateFare, loadPricingPolicy } from "@/lib/fare";
+import { sendPushToMany } from "@/lib/notifications";
+import { logger } from "@/lib/logger";
 
 export const GET = withErrorHandler(async (req: NextRequest) => {
   const authUser = optionalAuth(req);
@@ -104,5 +106,54 @@ export const POST = withErrorHandler(async (req: NextRequest) => {
     },
   });
 
+  // Alert available drivers. Nothing did this before — the driver app polled
+  // /api/rides/available and a request sat unseen until someone happened to
+  // refresh, which on a thin township driver pool is the difference between a
+  // ride being taken and being abandoned.
+  //
+  // Deliberately not awaited into the response path: a slow or failing push must
+  // not delay or fail a ride that is already created.
+  notifyAvailableDrivers(ride.id, pickup.address, fare.total, eta.distanceKm).catch(() => {
+    /* notifyAvailableDrivers already logs; a failed alert never fails a booking */
+  });
+
   return created({ ...ride, fareBreakdown: fare });
 });
+
+/**
+ * Fans a new-ride alert out to online, approved drivers.
+ *
+ * Bounded with `take` because this is a broadcast: an unbounded fan-out would grow
+ * with the driver roster and turn one booking into an arbitrarily large push batch.
+ * Ordering by most recently updated favours drivers whose location is freshest, so
+ * the cap tends to select the ones actually driving.
+ */
+async function notifyAvailableDrivers(
+  rideId: string,
+  pickupAddress: string,
+  fare: number,
+  distanceKm: number
+): Promise<void> {
+  try {
+    const drivers = await prisma.driver.findMany({
+      where: { isOnline: true, isApproved: true, user: { pushToken: { not: null } } },
+      select: { user: { select: { pushToken: true } } },
+      orderBy: { updatedAt: "desc" },
+      take: 50,
+    });
+
+    if (!drivers.length) return;
+
+    await sendPushToMany(
+      drivers.map((d) => d.user.pushToken),
+      "New ride request 🚗",
+      `${distanceKm.toFixed(1)} km from ${pickupAddress} · R${fare.toFixed(2)}`,
+      { rideId, screen: "available" }
+    );
+  } catch (error) {
+    logger.warn("[rides] failed to notify available drivers", {
+      rideId,
+      error: error instanceof Error ? error.message : String(error),
+    });
+  }
+}

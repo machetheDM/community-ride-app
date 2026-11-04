@@ -35,14 +35,14 @@ export async function PATCH(
         ...(status === "CANCELLED"        ? { cancelledAt: new Date() } : {}),
       },
       include: {
-        customer: { select: { id: true, name: true, fcmToken: true } },
+        customer: { select: { id: true, name: true, pushToken: true } },
         store: { select: { name: true } },
       },
     });
 
     const msg = STATUS_MESSAGES[status];
-    if (msg && order.customer.fcmToken) {
-      await sendPushToUser(order.customer.fcmToken, msg.title, msg.body, {
+    if (msg && order.customer.pushToken) {
+      await sendPushToUser(order.customer.pushToken, msg.title, msg.body, {
         orderId: order.id,
         screen: "orders",
       });
