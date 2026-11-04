@@ -6,6 +6,7 @@ import { ok } from "@/lib/response";
 import { withErrorHandler } from "@/lib/handler";
 import { NotFoundError, AuthorizationError } from "@/lib/errors";
 import { sendPushToUser } from "@/lib/notifications";
+import { emitOrderEvent } from "@/lib/analytics";
 
 /**
  * Advances a delivery through its own lifecycle.
@@ -88,13 +89,26 @@ export const PATCH = withErrorHandler(async (req: NextRequest, ctx) => {
   // Keep the merchant-facing order status in step with the rider-facing one.
   const orderStatus = ORDER_STATUS_FOR[status];
   if (orderStatus) {
-    await prisma.order.update({
+    const order = await prisma.order.update({
       where: { id: delivery.orderId },
       data: {
         status: orderStatus as never,
         ...(orderStatus === "DELIVERED" ? { deliveredAt: now } : {}),
       },
+      include: {
+        store: { select: { name: true } },
+        _count: { select: { items: true } },
+      },
     });
+
+    if (orderStatus === "DELIVERED") {
+      emitOrderEvent({
+        ...order,
+        storeName: order.store.name,
+        itemCount: order._count.items,
+        riderId: delivery.riderId,
+      });
+    }
   }
 
   const msg = DELIVERY_MESSAGES[status];

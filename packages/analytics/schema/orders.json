@@ -1,0 +1,21 @@
+[
+  { "name": "event_id", "type": "STRING", "mode": "REQUIRED", "description": "Idempotency key for the event" },
+  { "name": "order_id", "type": "STRING", "mode": "REQUIRED", "description": "Order.id in the operational database" },
+  { "name": "occurred_at", "type": "TIMESTAMP", "mode": "REQUIRED", "description": "When the order reached its terminal state; the partitioning column" },
+  { "name": "status", "type": "STRING", "mode": "REQUIRED", "description": "DELIVERED | CANCELLED" },
+
+  { "name": "store_id", "type": "STRING", "mode": "REQUIRED" },
+  { "name": "store_name", "type": "STRING", "mode": "NULLABLE" },
+  { "name": "delivery_area", "type": "STRING", "mode": "NULLABLE", "description": "Coarse suburb/township label; the clustering column" },
+
+  { "name": "item_count", "type": "INTEGER", "mode": "NULLABLE" },
+  { "name": "subtotal", "type": "NUMERIC", "mode": "NULLABLE" },
+  { "name": "delivery_fee", "type": "NUMERIC", "mode": "NULLABLE" },
+  { "name": "total", "type": "NUMERIC", "mode": "NULLABLE" },
+  { "name": "payment_method", "type": "STRING", "mode": "NULLABLE" },
+
+  { "name": "customer_key", "type": "STRING", "mode": "NULLABLE", "description": "Salted SHA-256 of the customer id — never the raw id" },
+  { "name": "rider_key", "type": "STRING", "mode": "NULLABLE", "description": "Salted SHA-256 of the rider id — never the raw id" },
+
+  { "name": "minutes_to_deliver", "type": "INTEGER", "mode": "NULLABLE", "description": "Order creation to delivery" }
+]
