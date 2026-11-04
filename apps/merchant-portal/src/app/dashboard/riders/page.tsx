@@ -55,10 +55,10 @@ export default async function RidersPage() {
         ),
     },
     {
-      key: "idNumber",
+      key: "idNumberLast4",
       header: "ID Number",
       cell: (rider: typeof riders[number]) => (
-        <span className="text-slate-300 text-xs font-mono">{rider.idNumber}</span>
+        <span className="text-slate-300 text-xs font-mono">{rider.idNumberLast4 ? `••• ${rider.idNumberLast4}` : "—"}</span>
       ),
     },
     {

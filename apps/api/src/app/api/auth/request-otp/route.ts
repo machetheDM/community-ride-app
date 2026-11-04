@@ -1,5 +1,6 @@
 import { NextRequest } from "next/server";
 import { randomInt } from "crypto";
+import { keyedHash } from "@ride/db/crypto";
 import { prisma } from "@/lib/prisma";
 import { parseBody, otpRequestSchema } from "@/lib/validate";
 import { ok } from "@/lib/response";
@@ -18,7 +19,7 @@ export const POST = withErrorHandler(async (req: NextRequest) => {
   const code = generateOtp();
   const expiresAt = new Date(Date.now() + 10 * 60 * 1000);
 
-  await prisma.otpCode.create({ data: { phone, code, expiresAt } });
+  await prisma.otpCode.create({ data: { phone, codeHash: keyedHash(code, "OTP_HASH_KEY"), expiresAt } });
 
   logger.info(`OTP requested for ${phone.slice(0, 6)}***`);
 

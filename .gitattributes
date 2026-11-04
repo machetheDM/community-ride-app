@@ -1,0 +1,9 @@
+# LF everywhere, so a Windows checkout and CI see the same bytes. Shell scripts
+# break outright on CRLF.
+* text=auto eol=lf
+*.sh text eol=lf
+*.ps1 text eol=crlf
+
+*.png binary
+*.jpg binary
+*.wasm binary

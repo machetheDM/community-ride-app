@@ -2,6 +2,7 @@ import { config } from "dotenv";
 import path from "path";
 import { PrismaPg } from "@prisma/adapter-pg";
 import { PrismaClient } from "../src/generated/prisma/index";
+import { protectIdNumber } from "../src/crypto";
 
 config({ path: path.resolve(__dirname, "../../../.env") });
 
@@ -242,7 +243,8 @@ async function main() {
       data: {
         userId: driverUser.id,
         licenseNumber: "DL-DEMO-0001",
-        idNumber: "9001015800087",
+        // Never a 13-digit number: a realistic one could belong to a real person.
+        ...protectIdNumber("DEMO-DRIVER-ID-0001"),
         isApproved: true,
         isOnline: false,
         rating: 4.8,
@@ -279,7 +281,7 @@ async function main() {
     (await prisma.rider.create({
       data: {
         userId: riderUser.id,
-        idNumber: "9202026200088",
+        ...protectIdNumber("DEMO-RIDER-ID-0001"),
         isApproved: true,
         isOnline: false,
         rating: 4.9,
@@ -293,7 +295,7 @@ async function main() {
     await prisma.vehicle.create({
       data: {
         riderId: rider.id,
-        type: "MOTORBIKE",
+        type: "SCOOTER",
         make: "Honda",
         model: "Wave",
         year: 2021,
@@ -364,9 +366,9 @@ async function main() {
         id: z.id,
         name: z.name,
         feeAmount: z.fee,
-        centerLat: z.lat,
-        centerLng: z.lng,
-        radiusKm: z.radiusKm,
+        // The schema stores no geometry for a zone yet; the centre and radius are
+        // kept as a description until zones become shapes (Phase 2.2).
+        description: `About ${z.radiusKm} km around ${z.lat}, ${z.lng}`,
         isActive: true,
       },
     });
@@ -384,14 +386,14 @@ async function main() {
       deliveryAddress: "5 Mooki St, Soweto",
       deliveryLat: -26.27,
       deliveryLng: 27.86,
-      subtotal: "110",
+      subtotal: "154",
       deliveryFee: "20",
-      total: "130",
+      total: "174",
       items: {
         create: [
-          { productId: "prod-pap-vleis", quantity: 1, unitPrice: "65" },
-          { productId: "prod-mageu", quantity: 2, unitPrice: "22" },
-          { productId: "prod-chakalaka", quantity: 1, unitPrice: "45" },
+          { productId: "prod-pap-vleis", quantity: 1, unitPrice: "65", totalPrice: "65" },
+          { productId: "prod-mageu", quantity: 2, unitPrice: "22", totalPrice: "44" },
+          { productId: "prod-chakalaka", quantity: 1, unitPrice: "45", totalPrice: "45" },
         ],
       },
     },
@@ -414,9 +416,9 @@ async function main() {
       dropoffLng: 27.854,
       distanceKm: 4.2,
       vehicleType: "SEDAN",
-      fare: "55",
-      platformFee: "5.5",
-      total: "55",
+      fareEstimate: "55",
+      fareActual: "55",
+      durationMinutes: 14,
       completedAt: new Date(Date.now() - 1000 * 60 * 60 * 2),
     },
   });
@@ -431,9 +433,7 @@ async function main() {
       userId: customerUser.id,
       amount: order.total,
       method: "CASH",
-      status: "PENDING",
-      type: "ORDER",
-      reference: "ORDER-001",
+      status: "PENDING",      reference: "ORDER-001",
     },
   });
 
@@ -444,11 +444,9 @@ async function main() {
       id: "pay-ride-001",
       rideId: ride.id,
       userId: customerUser.id,
-      amount: ride.total,
+      amount: ride.fareActual ?? ride.fareEstimate,
       method: "WALLET",
-      status: "COMPLETED",
-      type: "RIDE",
-      reference: "RIDE-001",
+      status: "COMPLETED",      reference: "RIDE-001",
     },
   });
 

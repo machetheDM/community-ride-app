@@ -3,19 +3,40 @@
   "ui": "tui",
   "tasks": {
     "build": {
-      "dependsOn": ["^build"],
-      "inputs": ["$TURBO_DEFAULT$", ".env*"],
-      "outputs": [".next/**", "!.next/cache/**", "dist/**"]
+      "dependsOn": [
+        "^build",
+        "^db:generate"
+      ],
+      "inputs": [
+        "$TURBO_DEFAULT$",
+        ".env*"
+      ],
+      "outputs": [
+        ".next/**",
+        "!.next/cache/**",
+        "dist/**"
+      ]
     },
     "dev": {
       "cache": false,
       "persistent": true
     },
     "lint": {
-      "dependsOn": ["^lint"]
+      "dependsOn": [
+        "^lint",
+        "^db:generate"
+      ]
     },
-    "typecheck": {},
-    "test": {},
+    "typecheck": {
+      "dependsOn": [
+        "^db:generate"
+      ]
+    },
+    "test": {
+      "dependsOn": [
+        "^db:generate"
+      ]
+    },
     "db:create-schema": {
       "cache": false
     },
