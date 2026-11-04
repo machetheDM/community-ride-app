@@ -55,3 +55,17 @@ Thumbs.db
 *.njsproj
 *.sln
 *.sw?
+
+# Terraform
+infra/**/.terraform/
+infra/**/terraform.tfvars
+infra/**/*.tfstate
+infra/**/*.tfstate.*
+infra/**/.terraform.lock.hcl
+
+# ML artefacts
+artifacts/
+
+# Python
+__pycache__/
+*.py[cod]

@@ -1,0 +1,31 @@
+# Copy to terraform.tfvars and fill in. terraform.tfvars is gitignored.
+#
+# Nothing secret belongs in this file. Secret *values* are added directly to
+# Secret Manager with gcloud — anything passed through a Terraform variable is
+# written to state in plaintext. See README.md step 4.
+
+project_id     = "community-ride-prod"
+project_number = "123456789012" # gcloud projects describe … --format='value(projectNumber)'
+
+billing_account_id = "01ABCD-234567-89EFGH" # gcloud billing accounts list
+
+# Johannesburg. Keeps latency low for Gauteng users and trip data in-country.
+region            = "africa-south1"
+bigquery_location = "africa-south1"
+
+github_repository = "machetheDM/community-ride-app"
+
+# Alert threshold, not a cap — GCP has no hard spending limit. Sized to catch a
+# leaked key or a retry loop, not to accommodate growth. Expected spend at
+# current volume is $0.
+monthly_budget_usd = 25
+
+# Empty on the first apply — Cloud Run is skipped until an image exists.
+# Set after pushing to Artifact Registry (README.md step 7), then apply again.
+api_image = ""
+
+# 0 during the growth phase: idle costs nothing, at the price of a cold start on
+# the first request after a quiet period. Raise to 1 once traffic is consistent
+# enough that cold-start latency on driver matching outweighs the idle cost.
+cloud_run_min_instances = 0
+cloud_run_max_instances = 4

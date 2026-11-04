@@ -1,0 +1,70 @@
+# Keep the host's node_modules out of the build context.
+#
+# This is not just a size optimisation — it is load-bearing. npm workspaces links
+# @ride/* into node_modules as symlinks, and on this Windows host those links are
+# ABSOLUTE paths (/c/Users/lenovo/...). Without this file, `COPY . .` overlays the
+# host tree on top of the node_modules the deps stage installed, every workspace
+# link inside the container points at a path that does not exist, and the build
+# fails with "module not found: @ride/push-service" — which reads like a missing
+# dependency rather than a clobbered one.
+node_modules
+**/node_modules
+
+# Build output — regenerated inside the image. Copying a host .next also risks
+# mixing platform-specific artefacts into a Linux image.
+.next
+**/.next
+dist
+**/dist
+out
+**/out
+build
+**/build
+
+# Expo / React Native — not part of the API image at all.
+.expo
+**/.expo
+web-build
+android
+ios
+
+# Turbo's local cache.
+.turbo
+**/.turbo
+
+# Secrets must never enter a build context: everything in it is readable from the
+# image's layers, whether or not a Dockerfile instruction references it.
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+gcloud-service-account*.json
+firebase-service-account*.json
+
+# Version control and CI.
+.git
+.github
+.gitignore
+
+# Tests and coverage — the image runs the app, it does not test it.
+coverage
+**/coverage
+**/*.test.ts
+**/*.test.tsx
+**/src/test
+
+# Editor and OS noise.
+.vscode
+.idea
+.DS_Store
+Thumbs.db
+*.log
+
+# Docs and infrastructure — no bearing on the runtime image.
+docs
+infra
+scripts
+README.md
+*.md
+!packages/*/README.md
