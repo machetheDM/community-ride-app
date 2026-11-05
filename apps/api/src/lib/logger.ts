@@ -1,4 +1,5 @@
 import { NextRequest } from "next/server";
+import { getClientIp } from "./client-ip";
 
 type LogLevel = "debug" | "info" | "warn" | "error";
 
@@ -40,6 +41,8 @@ export function logRequest(req: NextRequest, durationMs: number, statusCode: num
     statusCode,
     durationMs,
     userAgent: req.headers.get("user-agent")?.slice(0, 80) ?? "unknown",
-    ip: req.headers.get("x-forwarded-for") ?? req.headers.get("x-real-ip") ?? "unknown",
+    // The trusted address, not the raw header: a log line is evidence, and the
+    // header's left-most entries are whatever the caller chose to write there.
+    ip: getClientIp(req),
   });
 }

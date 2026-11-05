@@ -2,27 +2,39 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { LayoutDashboard, ShoppingBag, Store, Users, Car, Bike, CreditCard, Settings, LogOut, Building2, BarChart3 } from "lucide-react";
-import { logoutMerchant } from "@/lib/actions";
+import {
+  LayoutDashboard,
+  ShoppingBag,
+  Store,
+  Users,
+  Car,
+  Bike,
+  CreditCard,
+  Settings,
+  LogOut,
+  Building2,
+  BarChart3,
+  ShieldOff,
+} from "lucide-react";
+import { signOut, signOutEverywhere } from "@/lib/actions";
+import type { NavIcon, NavSections } from "@/lib/access";
 import { Avatar } from "@/components/ui/Avatar";
 
-const navItems = [
-  { href: "/dashboard", label: "Overview", icon: LayoutDashboard },
-  { href: "/dashboard/orders", label: "Orders", icon: ShoppingBag },
-  { href: "/dashboard/store", label: "My Store", icon: Store },
-];
+const icons: Record<NavIcon, React.ElementType> = {
+  overview: LayoutDashboard,
+  orders: ShoppingBag,
+  store: Store,
+  analytics: BarChart3,
+  stores: Building2,
+  drivers: Car,
+  riders: Bike,
+  users: Users,
+  payments: CreditCard,
+  settings: Settings,
+};
 
-const adminItems = [
-  { href: "/dashboard/analytics", label: "Analytics", icon: BarChart3 },
-  { href: "/dashboard/stores", label: "Stores", icon: Building2 },
-  { href: "/dashboard/drivers", label: "Drivers", icon: Car },
-  { href: "/dashboard/riders", label: "Riders", icon: Bike },
-  { href: "/dashboard/users", label: "Users", icon: Users },
-  { href: "/dashboard/payments", label: "Payments", icon: CreditCard },
-  { href: "/dashboard/settings", label: "Settings", icon: Settings },
-];
-
-function NavLink({ href, label, icon: Icon, active }: { href: string; label: string; icon: React.ElementType; active: boolean }) {
+function NavLink({ href, label, icon, active }: { href: string; label: string; icon: NavIcon; active: boolean }) {
+  const Icon = icons[icon];
   return (
     <Link
       href={href}
@@ -40,8 +52,13 @@ function NavLink({ href, label, icon: Icon, active }: { href: string; label: str
   );
 }
 
-export function Sidebar({ name }: { name: string }) {
+/**
+ * Shows only the links the signed-in role may open (`navFor` in `lib/access.ts`).
+ * Hiding a link is a courtesy, not a control: every page enforces its own access.
+ */
+export function Sidebar({ name, roleLabel, nav }: { name: string; roleLabel: string; nav: NavSections }) {
   const pathname = usePathname();
+  const isActive = (href: string) => pathname === href || (href !== "/dashboard" && pathname.startsWith(href));
 
   return (
     <aside className="w-60 bg-[#1e293b]/90 backdrop-blur-md border-r border-slate-700/50 flex flex-col shrink-0">
@@ -50,28 +67,28 @@ export function Sidebar({ name }: { name: string }) {
           <Avatar name={name} size="md" />
           <div className="min-w-0">
             <p className="font-bold text-slate-100 text-sm truncate">{name}</p>
-            <p className="text-xs text-slate-400">Merchant Portal</p>
+            <p className="text-xs text-slate-400">{roleLabel}</p>
           </div>
         </div>
       </div>
 
       <nav className="flex-1 p-3 space-y-1 overflow-auto">
-        {navItems.map(({ href, label, icon }) => {
-          const active = pathname === href || (href !== "/dashboard" && pathname.startsWith(href));
-          return <NavLink key={href} href={href} label={label} icon={icon} active={active} />;
-        })}
+        {nav.main.map(({ href, label, icon }) => (
+          <NavLink key={href} href={href} label={label} icon={icon} active={isActive(href)} />
+        ))}
 
-        <div className="pt-3 mt-3 border-t border-slate-700/50">
-          <p className="px-3 text-[10px] font-semibold text-slate-500 uppercase tracking-wider mb-2">Administration</p>
-          {adminItems.map(({ href, label, icon }) => {
-            const active = pathname === href || pathname.startsWith(href);
-            return <NavLink key={href} href={href} label={label} icon={icon} active={active} />;
-          })}
-        </div>
+        {nav.admin.length > 0 && (
+          <div className="pt-3 mt-3 border-t border-slate-700/50">
+            <p className="px-3 text-[10px] font-semibold text-slate-500 uppercase tracking-wider mb-2">Administration</p>
+            {nav.admin.map(({ href, label, icon }) => (
+              <NavLink key={href} href={href} label={label} icon={icon} active={isActive(href)} />
+            ))}
+          </div>
+        )}
       </nav>
 
-      <div className="p-3 border-t border-slate-700/50">
-        <form action={logoutMerchant}>
+      <div className="p-3 border-t border-slate-700/50 space-y-1">
+        <form action={signOut}>
           <button
             type="submit"
             className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium text-slate-400 hover:text-red-400 hover:bg-red-500/10 transition-colors"
@@ -80,6 +97,18 @@ export function Sidebar({ name }: { name: string }) {
               <LogOut size={16} />
             </div>
             Sign Out
+          </button>
+        </form>
+        <form action={signOutEverywhere}>
+          <button
+            type="submit"
+            title="Ends every portal session and signs this number out of the apps"
+            className="w-full flex items-center gap-3 px-3 py-2 rounded-xl text-xs font-medium text-slate-500 hover:text-red-400 hover:bg-red-500/10 transition-colors"
+          >
+            <div className="p-1.5 rounded-lg bg-slate-700/30">
+              <ShieldOff size={14} />
+            </div>
+            Sign out everywhere
           </button>
         </form>
       </div>

@@ -1,15 +1,13 @@
-import { redirect } from "next/navigation";
 import { MapPin, Phone, Package, Star, CheckCircle, Clock } from "lucide-react";
 import { prisma } from "@/lib/prisma";
-import { getSession } from "@/lib/session";
+import { requireMerchant } from "@/lib/session";
 import { StoreToggle } from "@/components/StoreToggle";
 
 export const metadata = { title: "My Store" };
 export const dynamic = "force-dynamic";
 
 export default async function StorePage() {
-  const session = await getSession();
-  if (!session) redirect("/login");
+  const session = await requireMerchant();
 
   const stores = await prisma.store.findMany({
     where: { merchantId: session.merchantId },

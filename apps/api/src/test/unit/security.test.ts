@@ -1,6 +1,47 @@
 import { describe, it, expect } from "@jest/globals";
 import { NextResponse } from "next/server";
-import { addSecurityHeaders, sanitizeInput, sanitizeObject } from "@/lib/security";
+import { addSecurityHeaders, applyCors, parseAllowedOrigins, sanitizeInput, sanitizeObject } from "@/lib/security";
+
+describe("parseAllowedOrigins", () => {
+  it("reads exact origins from a comma-separated list, normalising each", () => {
+    const origins = parseAllowedOrigins(" https://portal.example.co.za , http://localhost:3001/ ");
+    expect([...origins]).toEqual(["https://portal.example.co.za", "http://localhost:3001"]);
+  });
+
+  it("refuses a wildcard, which would undo the allow-list", () => {
+    expect(parseAllowedOrigins("*").size).toBe(0);
+    expect([...parseAllowedOrigins("*, https://ok.example")]).toEqual(["https://ok.example"]);
+  });
+
+  it("ignores values that are not http or https origins", () => {
+    expect(parseAllowedOrigins("not a url, ftp://files.example, javascript:alert(1)").size).toBe(0);
+  });
+
+  it("allows nothing when unset", () => {
+    expect(parseAllowedOrigins(undefined).size).toBe(0);
+  });
+});
+
+describe("applyCors", () => {
+  const allowed = parseAllowedOrigins("https://portal.example.co.za");
+
+  it("echoes an allowed origin, never a wildcard", () => {
+    const res = applyCors(NextResponse.next(), "https://portal.example.co.za", allowed);
+    expect(res.headers.get("Access-Control-Allow-Origin")).toBe("https://portal.example.co.za");
+    expect(res.headers.get("Vary")).toContain("Origin");
+  });
+
+  it("gives any other origin no allow header, so the browser withholds the response", () => {
+    const res = applyCors(NextResponse.next(), "https://evil.example", allowed);
+    expect(res.headers.get("Access-Control-Allow-Origin")).toBeNull();
+    expect(res.headers.get("Vary")).toContain("Origin");
+  });
+
+  it("leaves a request with no Origin, like the mobile apps', untouched", () => {
+    const res = applyCors(NextResponse.next(), null, allowed);
+    expect(res.headers.get("Access-Control-Allow-Origin")).toBeNull();
+  });
+});
 
 describe("addSecurityHeaders", () => {
   it("sets the expected hardening headers", () => {

@@ -1,7 +1,6 @@
-import { redirect } from "next/navigation";
 import { DollarSign, MapPin } from "lucide-react";
 import { prisma } from "@/lib/prisma";
-import { getSession } from "@/lib/session";
+import { requireAdmin } from "@/lib/session";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { Card } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
@@ -11,8 +10,8 @@ export const metadata = { title: "Settings" };
 export const dynamic = "force-dynamic";
 
 export default async function SettingsPage() {
-  const session = await getSession();
-  if (!session) redirect("/login");
+  // Platform pricing: ADMIN only.
+  await requireAdmin();
 
   const [pricingConfigs, deliveryZones] = await Promise.all([
     prisma.pricingConfig.findMany({ orderBy: { createdAt: "desc" } }),

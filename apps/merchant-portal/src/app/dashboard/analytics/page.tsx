@@ -11,8 +11,7 @@ import { PageHeader } from "@/components/ui/PageHeader";
 import { StatCard } from "@/components/ui/StatCard";
 import { Card } from "@/components/ui/Card";
 import { EmptyState } from "@/components/ui/EmptyState";
-import { getSession } from "@/lib/session";
-import { redirect } from "next/navigation";
+import { requireAdmin } from "@/lib/session";
 
 /**
  * Trip analytics, read from BigQuery.
@@ -42,8 +41,8 @@ const currency = new Intl.NumberFormat("en-ZA", {
 });
 
 export default async function AnalyticsPage() {
-  const session = await getSession();
-  if (!session) redirect("/login");
+  // Platform-wide trip data: ADMIN only.
+  await requireAdmin();
 
   if (!isQueryable()) {
     return (

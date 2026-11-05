@@ -1,7 +1,7 @@
-import { redirect } from "next/navigation";
 import { DollarSign, CreditCard, Banknote } from "lucide-react";
 import { prisma } from "@/lib/prisma";
-import { getSession } from "@/lib/session";
+import { requireAdmin } from "@/lib/session";
+import { auditAdminRead } from "@/lib/audit";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { Card } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
@@ -28,8 +28,7 @@ const methodIcon: Record<string, React.ReactNode> = {
 };
 
 export default async function PaymentsPage() {
-  const session = await getSession();
-  if (!session) redirect("/login");
+  const session = await requireAdmin();
 
   const payments = await prisma.payment.findMany({
     orderBy: { createdAt: "desc" },
@@ -40,6 +39,8 @@ export default async function PaymentsPage() {
       order: { select: { id: true, store: { select: { name: true } } } },
     },
   });
+  // Customers' names, phones and trip addresses beside money: audited like the people pages.
+  await auditAdminRead(session, "Payment", payments.length);
 
   const totalRevenue = payments
     .filter((p) => p.status === "COMPLETED")

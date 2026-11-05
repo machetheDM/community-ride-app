@@ -1,8 +1,7 @@
 import Link from "next/link";
-import { redirect } from "next/navigation";
-import { ShoppingBag, Package, DollarSign, Store as StoreIcon, ArrowRight } from "lucide-react";
+import { ShoppingBag, Package, DollarSign, Store as StoreIcon, ArrowRight, Users, Car, Bike } from "lucide-react";
 import { prisma } from "@/lib/prisma";
-import { getSession } from "@/lib/session";
+import { requireSession, type PortalSession } from "@/lib/session";
 import { AutoRefresh } from "@/components/AutoRefresh";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { Card } from "@/components/ui/Card";
@@ -24,24 +23,60 @@ const statusVariant: Record<string, "default" | "success" | "warning" | "danger"
   CANCELLED: "danger",
 };
 
-export default async function MerchantDashboard() {
-  const session = await getSession();
-  if (!session) redirect("/login");
+/**
+ * The overview: a merchant's own figures or, for an admin who runs no store,
+ * platform totals. Counts only; the people behind them are on the admin pages,
+ * where every view is audited.
+ */
+export default async function Overview() {
+  const session = await requireSession();
+  if (session.merchantId === null) return <AdminOverview session={session} />;
+  return <MerchantOverview session={session} merchantId={session.merchantId} />;
+}
 
+async function AdminOverview({ session }: { session: PortalSession }) {
   const startOfDay = new Date();
   startOfDay.setHours(0, 0, 0, 0);
-  const storeWhere = { store: { merchantId: session.merchantId } };
+
+  const [customers, drivers, riders, stores, ordersToday, ridesToday] = await Promise.all([
+    prisma.user.count({ where: { role: "CUSTOMER" } }),
+    prisma.driver.count(),
+    prisma.rider.count(),
+    prisma.store.count(),
+    prisma.order.count({ where: { createdAt: { gte: startOfDay } } }),
+    prisma.ride.count({ where: { createdAt: { gte: startOfDay } } }),
+  ]);
+
+  return (
+    <div className="p-8">
+      <PageHeader title={`Welcome back, ${session.name}`} subtitle="Platform overview" />
+      <div className="grid grid-cols-2 xl:grid-cols-3 gap-4">
+        <StatCard label="Customers" value={String(customers)} icon={Users} color="blue" />
+        <StatCard label="Drivers" value={String(drivers)} icon={Car} color="emerald" />
+        <StatCard label="Riders" value={String(riders)} icon={Bike} color="amber" />
+        <StatCard label="Stores" value={String(stores)} icon={StoreIcon} color="purple" />
+        <StatCard label="Orders Today" value={String(ordersToday)} icon={ShoppingBag} color="cyan" />
+        <StatCard label="Rides Today" value={String(ridesToday)} icon={Car} color="red" />
+      </div>
+    </div>
+  );
+}
+
+async function MerchantOverview({ session, merchantId }: { session: PortalSession; merchantId: string }) {
+  const startOfDay = new Date();
+  startOfDay.setHours(0, 0, 0, 0);
+  const storeWhere = { store: { merchantId } };
 
   const [todayOrders, pendingOrders, activeProducts, deliveredToday, stores, recentOrders] = await Promise.all([
     prisma.order.count({ where: { ...storeWhere, createdAt: { gte: startOfDay } } }),
     prisma.order.count({ where: { ...storeWhere, status: { in: ["PENDING", "CONFIRMED", "PREPARING"] } } }),
-    prisma.product.count({ where: { store: { merchantId: session.merchantId }, isAvailable: true } }),
+    prisma.product.count({ where: { store: { merchantId }, isAvailable: true } }),
     prisma.order.findMany({
       where: { ...storeWhere, status: "DELIVERED", deliveredAt: { gte: startOfDay } },
       select: { total: true },
     }),
     prisma.store.findMany({
-      where: { merchantId: session.merchantId },
+      where: { merchantId },
       select: { id: true, name: true, isOpen: true },
       orderBy: { createdAt: "asc" },
     }),
