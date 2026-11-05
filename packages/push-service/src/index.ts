@@ -151,14 +151,18 @@ async function getMessaging(log: PushLogger): Promise<FirebaseMessaging | null> 
         return null;
       }
 
-      const admin = await import("firebase-admin");
-      const app =
-        admin.apps.length && admin.apps[0]
-          ? admin.apps[0]
-          : admin.initializeApp({ credential: admin.credential.cert(credentials) });
+      // The modular entry points. firebase-admin 14 removed the namespaced API
+      // (`admin.apps`, `admin.credential`, `admin.messaging()`); these have existed
+      // since version 10, and importing only the app and messaging modules keeps
+      // the rest of the SDK out of the server bundle.
+      const [{ cert, getApps, initializeApp }, { getMessaging }] = await Promise.all([
+        import("firebase-admin/app"),
+        import("firebase-admin/messaging"),
+      ]);
+      const app = getApps()[0] ?? initializeApp({ credential: cert(credentials) });
 
       log.info("[push] Firebase Admin initialised", { projectId: credentials.projectId });
-      return admin.messaging(app) as unknown as FirebaseMessaging;
+      return getMessaging(app) as unknown as FirebaseMessaging;
     } catch (error) {
       log.error("[push] Firebase Admin failed to initialise — FCM transport disabled", {
         error: error instanceof Error ? error.message : String(error),
