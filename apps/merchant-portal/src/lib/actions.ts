@@ -3,6 +3,7 @@
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { recordAuditStrict } from "@ride/db";
+import { canTransitionOrder, type OrderStatus } from "@ride/db/lifecycle";
 import { issueOtp, maskPhone, normaliseSaMobile, smsTransportFromEnv, verifyOtp } from "@ride/db/otp";
 import { prisma } from "./prisma";
 import { endSession, sessionFor, startSession } from "./session";
@@ -173,7 +174,13 @@ export async function updateOrderStatus(orderId: unknown, status: unknown): Prom
   });
   if (!order) return { error: "Order not found" };
 
-  // LIFECYCLE: wire canTransitionOrder from @ride/db/lifecycle after merge
+  // The step must exist in the order lifecycle from the status just read: a store
+  // cannot skip PREPARING, go backwards, or reopen a cancelled order. The same
+  // table the API enforces (packages/db/src/lifecycle.ts), so the two apps cannot
+  // disagree about what a store may do.
+  if (!canTransitionOrder(order.status as OrderStatus, status, "MERCHANT")) {
+    return { error: `An order that is ${order.status.replace(/_/g, " ").toLowerCase()} cannot move to that status` };
+  }
 
   const now = new Date();
   const ip = await requestIp();
