@@ -15,13 +15,19 @@
   },
   "peerDependencies": {
     "react": "*",
-    "react-native": "*",
-    "react-native-maps": "*"
+    "react-native": "^0.76.9",
+    "react-native-maps": "^1.18.4"
   },
   "peerDependenciesMeta": {
-    "react": { "optional": true },
-    "react-native": { "optional": true },
-    "react-native-maps": { "optional": true }
+    "react": {
+      "optional": true
+    },
+    "react-native": {
+      "optional": true
+    },
+    "react-native-maps": {
+      "optional": true
+    }
   },
   "devDependencies": {
     "@types/node": "^20",
