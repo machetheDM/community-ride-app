@@ -21,7 +21,7 @@
 # pin invisible to the scanner (CKV_DOCKER_7) and to the bot that keeps it current.
 
 # ─── deps ─────────────────────────────────────────────────────
-FROM node:24-alpine@sha256:8a32c8cf649a49915a66e81e7a609223c708d0adabf288ee3f4077d765542f85 AS deps
+FROM node:26-alpine@sha256:c6ad9e9c1d80f6eb607c26b4b0a132ff7a2344fad1c78ea3baa2a7d4c8de6d94 AS deps
 WORKDIR /repo
 
 # Only the manifests, so this layer is cached until a dependency actually
@@ -43,7 +43,7 @@ COPY packages/analytics/package.json ./packages/analytics/
 RUN npm ci
 
 # ─── build ────────────────────────────────────────────────────
-FROM node:24-alpine@sha256:8a32c8cf649a49915a66e81e7a609223c708d0adabf288ee3f4077d765542f85 AS builder
+FROM node:26-alpine@sha256:c6ad9e9c1d80f6eb607c26b4b0a132ff7a2344fad1c78ea3baa2a7d4c8de6d94 AS builder
 WORKDIR /repo
 
 COPY --from=deps /repo/node_modules ./node_modules
@@ -64,7 +64,7 @@ ENV JWT_SECRET="build-time-only-never-used-at-runtime"
 RUN npm run build --workspace @ride/api
 
 # ─── runtime ──────────────────────────────────────────────────
-FROM node:24-alpine@sha256:8a32c8cf649a49915a66e81e7a609223c708d0adabf288ee3f4077d765542f85 AS runner
+FROM node:26-alpine@sha256:c6ad9e9c1d80f6eb607c26b4b0a132ff7a2344fad1c78ea3baa2a7d4c8de6d94 AS runner
 WORKDIR /app
 
 ENV NODE_ENV=production
