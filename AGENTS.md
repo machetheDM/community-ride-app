@@ -124,6 +124,10 @@ real personal data.
   The main checkout is unaffected.
 - A Dockerfile base image held in an `ARG` is invisible to Checkov (CKV_DOCKER_7) and to
   Dependabot; write the pinned digest on each `FROM` line.
+- `next build` rewrites `.next/types`, which the Next apps' type-check reads through
+  `next-env.d.ts`. Run in parallel, the type-check failed on half-written route types
+  (seen after `/admin` was removed). `turbo.json` makes each package's `build` wait for
+  its own `typecheck`.
 
 ## Verification
 
@@ -136,13 +140,18 @@ Terraform: `terraform -chdir=infra/gcp fmt -check; terraform -chdir=infra/gcp va
 
 ## State (5 November 2026)
 
-- Phase 0 (clean start) and Phase 1 (close the security holes) of `docs/PLAN.md` in progress.
-- Pull requests #1 to #5 merged.
+- Phase 0 (clean start) and Phase 1 (close the security holes) of `docs/PLAN.md` done:
+  every hole in the plan's section 2 closed, 48 threat-model rows DONE. Next is Phase 2
+  (delivery end to end, starting with the Expo SDK upgrade).
+- Tests: unit (`npx turbo test`) and integration against Postgres
+  (`npm run test:integration -w @ride/api`, needs `TEST_DATABASE_URL` on localhost).
 - Nothing deployed. No GCP project. No real users or data.
 
 ## Open
 
-- The owner decides whether `docs/PLAN.md` and `docs/threat-model.md` are committed to this
-  public repository, or the repository goes private with a public showcase.
 - FCM still uses a downloaded service-account key (threat model PU-2).
+- Mobile tokens last 30 days with no refresh (AU-4); the portal's CSP allows inline scripts
+  until a nonce is set per request; one database credential is shared by API and portal (IN-4).
+- `TRUST_PROXY_HOPS=1` follows Google's documentation for Cloud Run; log the raw header once
+  after the first deploy to confirm it.
 - Area, expected numbers and the SMS provider: the owner's to supply.
