@@ -1,33 +1,22 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextRequest } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { ok } from "@/lib/response";
+import { withErrorHandler } from "@/lib/handler";
+import { NotFoundError } from "@/lib/errors";
+import { storeDetailSelect } from "@/lib/views";
 
-export async function GET(
-  _req: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
-) {
-  try {
-    const { id } = await params;
+/**
+ * Public store page: the store's shop-window fields and its menu. No
+ * `merchantId`, no phone, no stock counts (threat model PA-3).
+ */
+export const GET = withErrorHandler(async (_req: NextRequest, ctx) => {
+  const { id } = await ctx.params;
 
-    const store = await prisma.store.findUnique({
-      where: { id, isApproved: true },
-      include: {
-        categories: {
-          include: {
-            products: {
-              where: { isAvailable: true },
-              orderBy: { name: "asc" },
-            },
-          },
-          orderBy: { name: "asc" },
-        },
-        _count: { select: { products: true, orders: true } },
-      },
-    });
+  const store = await prisma.store.findFirst({
+    where: { id, isApproved: true },
+    select: storeDetailSelect,
+  });
+  if (!store) throw new NotFoundError("Store");
 
-    if (!store) return NextResponse.json({ error: "Store not found" }, { status: 404 });
-
-    return NextResponse.json({ success: true, data: store });
-  } catch {
-    return NextResponse.json({ error: "Failed to fetch store" }, { status: 500 });
-  }
-}
+  return ok(store);
+});
