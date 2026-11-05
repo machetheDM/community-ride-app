@@ -2,7 +2,7 @@ import { config } from "dotenv";
 import path from "path";
 import { PrismaPg } from "@prisma/adapter-pg";
 import { PrismaClient } from "../src/generated/prisma/index";
-import { protectIdNumber } from "../src/crypto";
+import { encryptField, protectIdNumber } from "../src/crypto";
 
 config({ path: path.resolve(__dirname, "../../../.env") });
 
@@ -23,13 +23,33 @@ async function main() {
     (await prisma.merchant.findUnique({ where: { userId: merchantUser.id } })) ??
     (await prisma.merchant.create({ data: { userId: merchantUser.id, isApproved: true } }));
 
+  // ── Shopping complex ───────────────────────────────────────────
+  // A made-up name: the demo must not read as a partnership with a real mall.
+  // Two of the four stores are in it; the other two stay stand-alone, so both
+  // kinds of store are exercised.
+  const complex = await prisma.complex.upsert({
+    where: { slug: "demo-junction" },
+    update: {},
+    create: {
+      id: "complex-demo-junction",
+      name: "Demo Junction Shopping Centre",
+      slug: "demo-junction",
+      address: "1 Demo Junction Rd, Soweto",
+      lat: -26.272,
+      lng: 27.875,
+      deliveryRadiusKm: 8,
+      deliveryFee: "18",
+    },
+  });
+
   // ── Store 1: Mama's Kitchen ────────────────────────────────────
   const kitchen = await prisma.store.upsert({
     where: { id: "store-mamas-kitchen" },
-    update: { isApproved: true, isOpen: true },
+    update: { isApproved: true, isOpen: true, complexId: complex.id },
     create: {
       id: "store-mamas-kitchen",
       merchantId: merchant.id,
+      complexId: complex.id,
       name: "Mama's Kitchen",
       description: "Home-cooked African meals delivered fresh to your door.",
       phone: "+27810000001",
@@ -182,10 +202,11 @@ async function main() {
   // ── Store 4: Kasi Fashion Hub ──────────────────────────────────
   const fashion = await prisma.store.upsert({
     where: { id: "store-kasi-fashion" },
-    update: { isApproved: true, isOpen: true },
+    update: { isApproved: true, isOpen: true, complexId: complex.id },
     create: {
       id: "store-kasi-fashion",
       merchantId: merchant.id,
+      complexId: complex.id,
       name: "Kasi Fashion Hub",
       description: "Streetwear, sneakers and urban fashion from local designers.",
       phone: "+27810000001",
@@ -387,8 +408,8 @@ async function main() {
       deliveryLat: -26.27,
       deliveryLng: 27.86,
       subtotal: "154",
-      deliveryFee: "20",
-      total: "174",
+      deliveryFee: "18", // the complex's fee: Mama's Kitchen is in Demo Junction
+      total: "172",
       items: {
         create: [
           { productId: "prod-pap-vleis", quantity: 1, unitPrice: "65", totalPrice: "65" },
@@ -396,6 +417,9 @@ async function main() {
           { productId: "prod-chakalaka", quantity: 1, unitPrice: "45", totalPrice: "45" },
         ],
       },
+      // Waiting for a rider. The demo handover code is fixed and published here so
+      // the flow can be walked through by hand; a real order's code is random.
+      delivery: { create: { handoverCodeEnc: encryptField("2580") } },
     },
   });
 
@@ -452,6 +476,7 @@ async function main() {
 
   console.log("✅ Seeded:");
   console.log(`   • 1 merchant`);
+  console.log(`   • 1 shopping complex (Demo Junction) holding 2 of the 4 stores`);
   console.log(`   • 4 stores (Mama's Kitchen, TownSquare Grocery, Pharm24, Kasi Fashion Hub)`);
   console.log(`   • 8 categories`);
   console.log(`   • ${kitchenProducts.length + groceryProducts.length + pharmProducts.length + fashionProducts.length} products`);
@@ -460,7 +485,7 @@ async function main() {
   console.log(`   • 1 customer (Lerato Customer, +27830000004)`);
   console.log(`   • 1 admin (+27810000000)`);
   console.log(`   • 2 pricing configs, 3 delivery zones`);
-  console.log(`   • 1 demo order + 1 demo ride + 2 payments`);
+  console.log(`   • 1 demo order waiting for a rider (handover code 2580) + 1 demo ride + 2 payments`);
 }
 
 main()

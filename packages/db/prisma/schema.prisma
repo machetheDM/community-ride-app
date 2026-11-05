@@ -264,10 +264,38 @@ model Merchant {
 
   @@schema("ride")
 }
+/// A shopping complex or mall: the unit the platform is sold to (docs/PLAN.md §1,
+/// Phase 2.2). Its stores share one delivery zone and one delivery fee, so a
+/// customer pays the same to have a loaf of bread or a phone charger brought from
+/// the same mall.
+model Complex {
+  id               String   @id @default(cuid())
+  name             String
+  slug             String   @unique
+  address          String
+  lat              Float
+  lng              Float
+  /// Orders are delivered within this distance of the complex, straight-line.
+  /// Further than a scooter can sensibly ride is refused at checkout, not
+  /// discovered by a rider halfway there.
+  deliveryRadiusKm Float    @default(8)
+  /// What the customer pays for delivery from any store in the complex.
+  deliveryFee      Decimal  @default(20) @db.Decimal(10, 2)
+  isActive         Boolean  @default(true)
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  stores Store[]
+
+  @@schema("ride")
+}
 model Store {
   id           String   @id @default(cuid())
   merchantId   String
   merchant     Merchant @relation(fields: [merchantId], references: [id])
+  /// Optional: a stand-alone shop keeps its own delivery fee and no radius.
+  complexId    String?
+  complex      Complex? @relation(fields: [complexId], references: [id])
   name         String
   description  String?
   phone        String
@@ -290,6 +318,7 @@ model Store {
   products   Product[]
   orders     Order[]
 
+  @@index([complexId])
   @@schema("ride")
 }
 model StoreCategory {
@@ -379,7 +408,18 @@ model Delivery {
   status           DeliveryStatus @default(PENDING)
   distanceKm       Float?
   estimatedMinutes Int?
+  /// The 4-digit code the customer gives the rider at the door, encrypted
+  /// (packages/db/src/crypto.ts). Encrypted rather than hashed because the
+  /// customer's app must show it; only the customer's view ever decrypts it, and
+  /// the rider's never carries it. Without it, "delivered" was whatever the rider
+  /// tapped (threat model OD-4, PLAN.md Phase 2.5).
+  handoverCodeEnc  String?
+  /// Wrong codes entered. At the limit the delivery can no longer be completed by
+  /// code, so four digits cannot be guessed at the door.
+  handoverAttempts Int            @default(0)
+  assignedAt       DateTime?
   pickedUpAt       DateTime?
+  enRouteAt        DateTime?
   deliveredAt      DateTime?
   failedAt         DateTime?
   failReason       String?
@@ -388,6 +428,9 @@ model Delivery {
 
   locations DeliveryLocation[]
 
+  // The dispatch list reads waiting deliveries (no rider, status PENDING) on
+  // every refresh of every online rider's app.
+  @@index([status, riderId])
   @@schema("ride")
 }
 model DeliveryLocation {

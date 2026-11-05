@@ -91,7 +91,12 @@ export type RideActor = "CUSTOMER" | "DRIVER" | "ADMIN";
  */
 export type OrderActor = "CUSTOMER" | "MERCHANT" | "ADMIN" | "DELIVERY";
 
-/** The rider assigned to the delivery. Dispatch (PENDING to ASSIGNED) is Phase 2. */
+/**
+ * A rider. For PENDING to ASSIGNED, any rider who may work (approved, online, an
+ * approved vehicle, no other active delivery); for every later move, only the
+ * rider the delivery is assigned to. The API checks which (`deliveries/[id]/accept`
+ * and `deliveries/[id]/status`).
+ */
 export type DeliveryActor = "RIDER";
 
 export interface Transition<S extends string, A extends string> {
@@ -164,6 +169,9 @@ export const ORDER_TRANSITIONS: readonly Transition<OrderStatus, OrderActor>[] =
 // ─── Deliveries ───────────────────────────────────────────────
 
 export const DELIVERY_TRANSITIONS: readonly Transition<DeliveryStatus, DeliveryActor>[] = [
+  // Dispatch (Phase 2.3). The order is not moved: the store may still be
+  // preparing it, and the pickup step checks it is ready.
+  { from: "PENDING", to: "ASSIGNED", action: "delivery.accept", actors: ["RIDER"] },
   { from: "ASSIGNED", to: "PICKED_UP", action: "delivery.pick_up", actors: ["RIDER"] },
   { from: "PICKED_UP", to: "EN_ROUTE", action: "delivery.en_route", actors: ["RIDER"] },
   { from: "EN_ROUTE", to: "DELIVERED", action: "delivery.deliver", actors: ["RIDER"] },
