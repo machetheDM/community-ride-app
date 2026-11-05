@@ -86,6 +86,67 @@ describe("getAuthUser", () => {
   });
 });
 
+describe("token algorithm, issuer and audience", () => {
+  const SECRET = "pinning-secret";
+  const claims = { userId: "u1", phone: "+27810000001", role: "ADMIN" };
+  const ours = { issuer: "community-ride-api", audience: "community-ride-apps" };
+
+  /** A JWT with whatever header the caller likes, signed (or not) by hand. */
+  function handMade(header: object, payload: object, signature = ""): string {
+    const enc = (part: object) => Buffer.from(JSON.stringify(part)).toString("base64url");
+    return `${enc(header)}.${enc(payload)}.${signature}`;
+  }
+
+  it("signs with HS256 and names this API as issuer and the apps as audience", () => {
+    env.JWT_SECRET = SECRET;
+    const decoded = jwt.decode(signAuthToken(claims), { complete: true });
+    expect(decoded?.header.alg).toBe("HS256");
+    expect(decoded?.payload).toMatchObject({ iss: "community-ride-api", aud: "community-ride-apps" });
+  });
+
+  it("carries the user's token version, so signing out everywhere can revoke it", () => {
+    env.JWT_SECRET = SECRET;
+    expect(jwt.decode(signAuthToken({ ...claims, tokenVersion: 4 }))).toMatchObject({ tokenVersion: 4 });
+    expect(jwt.decode(signAuthToken(claims))).toMatchObject({ tokenVersion: 0 });
+  });
+
+  it("refuses an unsigned token (alg: none)", () => {
+    env.JWT_SECRET = SECRET;
+    const now = Math.floor(Date.now() / 1000);
+    const unsigned = handMade(
+      { alg: "none", typ: "JWT" },
+      { ...claims, iss: ours.issuer, aud: ours.audience, iat: now, exp: now + 60 }
+    );
+    expect(getAuthUser(bearer(unsigned))).toBeNull();
+  });
+
+  it("refuses a token signed with the right secret under another algorithm", () => {
+    env.JWT_SECRET = SECRET;
+    const hs512 = jwt.sign(claims, SECRET, { algorithm: "HS512", ...ours });
+    expect(getAuthUser(bearer(hs512))).toBeNull();
+  });
+
+  it("refuses a token minted for another audience", () => {
+    env.JWT_SECRET = SECRET;
+    const elsewhere = jwt.sign(claims, SECRET, { algorithm: "HS256", issuer: ours.issuer, audience: "some-other-service" });
+    expect(getAuthUser(bearer(elsewhere))).toBeNull();
+  });
+
+  it("refuses a token from another issuer, or with no issuer and audience at all", () => {
+    env.JWT_SECRET = SECRET;
+    const otherIssuer = jwt.sign(claims, SECRET, { algorithm: "HS256", issuer: "someone-else", audience: ours.audience });
+    const bare = jwt.sign(claims, SECRET, { algorithm: "HS256" });
+    expect(getAuthUser(bearer(otherIssuer))).toBeNull();
+    expect(getAuthUser(bearer(bare))).toBeNull();
+  });
+
+  it("refuses a genuine token whose payload names no user", () => {
+    env.JWT_SECRET = SECRET;
+    const anonymous = jwt.sign({ role: "ADMIN" }, SECRET, { algorithm: "HS256", ...ours });
+    expect(getAuthUser(bearer(anonymous))).toBeNull();
+  });
+});
+
 describe("requireAuth / requireRole", () => {
   it("throws AuthenticationError when unauthenticated", () => {
     expect(() => requireAuth(new NextRequest("http://localhost/api/rides"))).toThrow(AuthenticationError);
