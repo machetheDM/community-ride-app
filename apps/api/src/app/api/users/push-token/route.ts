@@ -1,7 +1,7 @@
 import { NextRequest } from "next/server";
 import { detectProvider } from "@ride/push-service";
 import { prisma } from "@/lib/prisma";
-import { requireAuth } from "@/lib/auth";
+import { requireActiveUser } from "@/lib/auth";
 import { parseBody, pushTokenSchema } from "@/lib/validate";
 import { ok } from "@/lib/response";
 import { withErrorHandler } from "@/lib/handler";
@@ -14,9 +14,13 @@ import { withErrorHandler } from "@/lib/handler";
  * on, and the shape is unambiguous. It is stored for observability — the send path
  * re-derives it per message, so a device that switches from Expo Go to a dev build
  * is routed correctly on its next push without waiting for this column to catch up.
+ *
+ * `requireActiveUser`, not the token alone: a suspended account must not be able
+ * to point its notifications at a new phone. The response confirms the
+ * registration and never echoes the token (threat model PU-1).
  */
 export const POST = withErrorHandler(async (req: NextRequest) => {
-  const authUser = requireAuth(req);
+  const authUser = await requireActiveUser(req);
   const { token } = await parseBody(req, pushTokenSchema);
   const provider = detectProvider(token);
 
