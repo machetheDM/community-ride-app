@@ -7,6 +7,7 @@ import {
   recordTrip,
   isQueryable,
   __resetAnalyticsClient,
+  __setAnalyticsClient,
   type TripEvent,
 } from "@ride/analytics";
 
@@ -85,16 +86,29 @@ describe("recordTrip", () => {
     await expect(recordTrip(RIDE)).resolves.toBe(false);
   });
 
-  it("gives up rather than hanging when credentials cannot be resolved", async () => {
+  it("gives up rather than hanging when BigQuery never answers", async () => {
     process.env.BIGQUERY_DATASET = "ride_analytics";
     process.env.GOOGLE_CLOUD_PROJECT = "community-ride";
-    // Application Default Credentials are absent here, so the client retries a
-    // metadata endpoint that never answers. On Cloud Run this resolves instantly;
-    // anywhere else it hangs, and because these writes are fired and not awaited a
-    // hang would pile up invisibly. The bound is what makes it deterministic.
+    // Off Cloud Run, a real client with no credentials hangs looking for them. Writes
+    // are fired and not awaited, so a hang would pile up invisibly; the bound is what
+    // makes the failure deterministic. A stand-in whose insert never settles tests
+    // that bound without the real client reaching for the network, which it did
+    // until November 2026, behind the fetch stub's back.
     process.env.BIGQUERY_TIMEOUT_MS = "150";
+    let inserts = 0;
+    __setAnalyticsClient({
+      dataset: () => ({
+        table: () => ({
+          insert: () => {
+            inserts++;
+            return new Promise(() => {});
+          },
+        }),
+      }),
+    });
 
     await expect(recordTrip(RIDE)).resolves.toBe(false);
+    expect(inserts).toBe(1);
   });
 
   afterEach(() => {

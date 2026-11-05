@@ -1,4 +1,5 @@
 import { NextRequest } from "next/server";
+import { keyedHash } from "@ride/db/crypto";
 import { prisma } from "@/lib/prisma";
 import { parseBody, otpVerifySchema } from "@/lib/validate";
 import { ok, unauthorized } from "@/lib/response";
@@ -11,7 +12,7 @@ export const POST = withErrorHandler(async (req: NextRequest) => {
   const now = new Date();
 
   const otp = await prisma.otpCode.findFirst({
-    where: { phone, code, used: false, expiresAt: { gt: now } },
+    where: { phone, codeHash: keyedHash(code, "OTP_HASH_KEY"), used: false, expiresAt: { gt: now } },
     orderBy: { createdAt: "desc" },
   });
 

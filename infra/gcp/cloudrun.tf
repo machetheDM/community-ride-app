@@ -9,6 +9,7 @@
  */
 
 resource "google_artifact_registry_repository" "containers" {
+  # checkov:skip=CKV_GCP_84:Google-managed encryption at rest is used. Customer-managed keys add a Cloud KMS key to run, rotate and pay for, and protect against a threat (Google staff reading the data) that is not in this project's threat model at one-district scale. Revisit if a client or regulator requires it (Scale tier).
   location      = var.region
   repository_id = "community-ride"
   description   = "Container images for the API and merchant portal"

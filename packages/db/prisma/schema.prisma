@@ -102,6 +102,12 @@ model User {
   pushToken     String?   @map("fcmToken")
   pushProvider  String    @default("expo") // expo | fcm
 
+  // Copied into every token at sign-in and compared on every request. Bumping it
+  // signs the user out everywhere at once: after a role change, a suspension, or
+  // a stolen phone. Without it a 30-day token outlives every decision made about
+  // the account it belongs to.
+  tokenVersion  Int       @default(0)
+
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
 
@@ -123,7 +129,16 @@ model Driver {
   userId        String   @unique
   user          User     @relation(fields: [userId], references: [id])
   licenseNumber String   @unique
-  idNumber      String   @unique
+
+  // A South African ID number is never stored as itself. `idNumberEnc` holds it
+  // encrypted (AES-256-GCM, see packages/db/src/crypto.ts), `idNumberHash` is a
+  // keyed hash so a duplicate registration can still be refused, and
+  // `idNumberLast4` is the only part any screen shows. Nullable because the
+  // number is captured at operator onboarding, not at sign-up.
+  idNumberEnc   String?
+  idNumberHash  String?  @unique
+  idNumberLast4 String?
+
   isOnline      Boolean  @default(false)
   isApproved    Boolean  @default(false)
   currentLat    Float?
@@ -144,7 +159,10 @@ model Rider {
   id              String   @id @default(cuid())
   userId          String   @unique
   user            User     @relation(fields: [userId], references: [id])
-  idNumber        String   @unique
+  // Same treatment as Driver: encrypted, a keyed hash for uniqueness, last four.
+  idNumberEnc     String?
+  idNumberHash    String?  @unique
+  idNumberLast4   String?
   isOnline        Boolean  @default(false)
   isApproved      Boolean  @default(false)
   currentLat      Float?
@@ -202,10 +220,13 @@ model Ride {
   durationMinutes Int?
   paymentMethod  PaymentMethod @default(CASH)
   scheduledAt    DateTime?
+  acceptedAt     DateTime?
+  arrivedAt      DateTime?
   startedAt      DateTime?
   completedAt    DateTime?
   cancelledAt    DateTime?
   cancelReason   String?
+  cancelledBy    String?    // CUSTOMER | DRIVER | ADMIN
   createdAt      DateTime   @default(now())
   updatedAt      DateTime   @updatedAt
 
@@ -319,9 +340,11 @@ model Order {
   paymentMethod   PaymentMethod @default(CASH)
   confirmedAt     DateTime?
   preparedAt      DateTime?
+  readyAt         DateTime?
   deliveredAt     DateTime?
   cancelledAt     DateTime?
   cancelReason    String?
+  cancelledBy     String?       // CUSTOMER | MERCHANT | ADMIN
   createdAt       DateTime      @default(now())
   updatedAt       DateTime      @updatedAt
 
@@ -490,12 +513,38 @@ model DeliveryZone {
 model OtpCode {
   id        String   @id @default(cuid())
   phone     String
-  code      String
+  // HMAC-SHA256 of the code under a server-held key, never the code itself. A
+  // plain hash would not help: six digits are a million guesses, so anyone who
+  // read this table could reverse an unkeyed hash in seconds.
+  codeHash  String
+  // Wrong guesses against this code. It is burned at the limit, so a code cannot
+  // be brute-forced however the requests are spread across addresses.
+  attempts  Int      @default(0)
   expiresAt DateTime
   used      Boolean  @default(false)
   createdAt DateTime @default(now())
 
-  @@index([phone])
+  @@index([phone, createdAt])
+
+  @@schema("ride")
+}
+
+/// Who did what, when — for admin actions, sign-ins, status changes and anything
+/// touching money (PRACTICES.md SEC-4). Rows are only ever inserted.
+model AuditLog {
+  id          String   @id @default(cuid())
+  createdAt   DateTime @default(now())
+  actorUserId String?
+  actorRole   String?
+  action      String   // e.g. ride.accept, order.status, auth.otp.verify.fail
+  entityType  String   // e.g. Ride, Order, User
+  entityId    String?
+  ip          String?
+  detail      Json?
+
+  @@index([entityType, entityId])
+  @@index([actorUserId, createdAt])
+  @@index([action, createdAt])
 
   @@schema("ride")
 }

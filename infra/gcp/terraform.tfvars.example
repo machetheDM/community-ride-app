@@ -15,6 +15,11 @@ bigquery_location = "africa-south1"
 
 github_repository = "machetheDM/community-ride-app"
 
+# Numeric ids; names can be re-registered, ids cannot.
+#   gh api repos/machetheDM/community-ride-app --jq '.id, .owner.id'
+github_repository_id       = "1268480292"
+github_repository_owner_id = "67542841"
+
 # Alert threshold, not a cap — GCP has no hard spending limit. Sized to catch a
 # leaked key or a retry loop, not to accommodate growth. Expected spend at
 # current volume is $0.

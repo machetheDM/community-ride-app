@@ -11,7 +11,8 @@
     "db:seed": "npx tsx prisma/seed.ts"
   },
   "exports": {
-    ".": "./src/index.ts"
+    ".": "./src/index.ts",
+    "./crypto": "./src/crypto.ts"
   },
   "dependencies": {
     "@prisma/adapter-pg": "^7.8.0",

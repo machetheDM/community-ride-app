@@ -221,3 +221,15 @@ export function recordOrder(event: OrderEvent, options?: AnalyticsOptions): Prom
 export function __resetAnalyticsClient(): void {
   clientPromise = null;
 }
+
+/**
+ * Test-only hook: supplies the client instead of constructing a real one.
+ *
+ * A real client with no credentials reaches for Google's metadata server through
+ * its own HTTP stack, which the unit tests' fetch stub cannot see, and keeps
+ * retrying on a timer after the test has finished. A stand-in whose insert never
+ * settles exercises the same timeout with no network at all.
+ */
+export function __setAnalyticsClient(client: BigQueryClient | null): void {
+  clientPromise = Promise.resolve(client);
+}

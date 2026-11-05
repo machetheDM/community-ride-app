@@ -1,0 +1,105 @@
+name: Security
+
+# Four scans, each answering a different question (PRACTICES ALL-4, DSO-2, DSO-3):
+#
+#   Secrets       did a credential ever reach the repository?   Gitleaks, full history
+#   Dependencies  is the code we borrowed exploitable?           npm audit + exceptions
+#   IaC           is the infrastructure we describe misconfigured? Checkov
+#   CodeQL        is the code we wrote exploitable?             SAST
+#
+# Every job blocks. A scan that can only print and pass is decoration. Each one has
+# been shown to fail on a planted issue (see docs/PLAN.md Phase 0.3).
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  schedule:
+    # Weekly, because most advisories arrive against code nobody touched.
+    - cron: "17 4 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  secrets:
+    name: "Secrets: Gitleaks (full history)"
+    runs-on: ubuntu-latest
+    env:
+      GITLEAKS_VERSION: "8.30.1"
+      # From the release's own checksums file, copied here so a replaced download
+      # fails the job instead of running.
+      GITLEAKS_SHA256: "551f6fc83ea457d62a0d98237cbad105af8d557003051f41f3e7ca7b3f2470eb"
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+        with:
+          # Full history: a secret committed and then deleted was still published.
+          fetch-depth: 0
+      # The binary, not a wrapper action: one less third party with write access to
+      # what runs here, and the download is checked against a pinned digest.
+      - name: Install Gitleaks
+        run: |
+          curl -sSfL -o gitleaks.tar.gz \
+            "https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}/gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz"
+          echo "${GITLEAKS_SHA256}  gitleaks.tar.gz" | sha256sum --check --strict
+          tar -xzf gitleaks.tar.gz gitleaks
+      - name: Scan every commit on every fetched ref
+        # .gitleaksignore lists reviewed false positives by exact fingerprint.
+        run: ./gitleaks git . --redact --verbose --exit-code 1 --log-opts="--all"
+
+  dependencies:
+    name: "Dependencies: npm audit gate"
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+      - uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5
+        with:
+          node-version: 24
+      # Reads package-lock.json; no install needed. Fails on any high or critical
+      # advisory not accepted, with a reason and an expiry, in
+      # security/audit-exceptions.json.
+      - name: Audit runtime dependencies
+        run: node scripts/audit-gate.mjs
+
+  iac:
+    name: "IaC: Checkov"
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
+        with:
+          python-version: "3.12"
+      - name: Install Checkov
+        run: pip install --disable-pip-version-check "checkov==3.4.3"
+      # Accepted findings are skipped inline in the Terraform, each with its reason,
+      # so a reviewer sees the decision next to the resource it is about.
+      - name: Terraform
+        run: checkov --directory infra/gcp --framework terraform --compact
+      - name: Dockerfile
+        run: checkov --file apps/api/Dockerfile --framework dockerfile --compact
+
+  codeql:
+    name: "SAST: CodeQL"
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      security-events: write
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+      - uses: github/codeql-action/init@33d7b85da1a04171e211befe2c739303b9a4c066 # v4
+        with:
+          languages: javascript-typescript
+          build-mode: none
+          # The lower-confidence security rules too. This code handles identity
+          # numbers and live locations; a false positive costs a read, a false
+          # negative costs someone's safety.
+          queries: security-extended
+      - uses: github/codeql-action/analyze@33d7b85da1a04171e211befe2c739303b9a4c066 # v4
+        with:
+          category: /language:javascript-typescript
