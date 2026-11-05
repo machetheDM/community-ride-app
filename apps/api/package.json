@@ -21,14 +21,14 @@
     "@ride/push-service": "*",
     "@ride/types": "*",
     "jsonwebtoken": "^9.0.3",
-    "lucide-react": "^1.11.0",
+    "lucide-react": "^1.66.0",
     "next": "16.4.5",
     "react": "19.3.1",
     "react-dom": "19.3.1",
     "zod": "^4.4.3"
   },
   "devDependencies": {
-    "@tailwindcss/postcss": "^4",
+    "@tailwindcss/postcss": "^4.3.3",
     "@types/jest": "^30.0.0",
     "@types/jsonwebtoken": "^9.0.10",
     "@types/node": "^20",
@@ -38,7 +38,7 @@
     "eslint": "^9",
     "eslint-config-next": "16.4.5",
     "jest": "^30.4.2",
-    "jest-environment-node": "^30.4.1",
+    "jest-environment-node": "^30.5.2",
     "tailwindcss": "^4",
     "typescript": "^5"
   }
