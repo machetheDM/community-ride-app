@@ -74,3 +74,6 @@ __pycache__/
 # test and build). Committed until November 2026, which let it drift from the
 # schema and put 13 MB of generated code into every review.
 packages/db/src/generated/
+
+# Agent worktrees created by Claude Code
+.claude/worktrees/

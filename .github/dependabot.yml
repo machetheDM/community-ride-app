@@ -1,0 +1,33 @@
+# Weekly, grouped, so updates arrive as a handful of reviewable pull requests
+# rather than dozens. Actions are pinned by commit (PRACTICES DSO-3); Dependabot
+# is what keeps those pins from going stale.
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    groups:
+      actions:
+        patterns: ["*"]
+
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+    groups:
+      # Expo and React Native move together and need a planned upgrade
+      # (docs/PLAN.md Phase 2.1), not a bot bumping one package of the set.
+      mobile:
+        patterns: ["expo", "expo-*", "@expo/*", "react-native", "react-native-*", "@react-native/*"]
+        update-types: ["patch"]
+      web-and-server:
+        patterns: ["*"]
+        exclude-patterns: ["expo", "expo-*", "@expo/*", "react-native", "react-native-*", "@react-native/*"]
+        update-types: ["minor", "patch"]
+
+  - package-ecosystem: docker
+    directory: /apps/api
+    schedule:
+      interval: weekly

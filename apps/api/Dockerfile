@@ -12,8 +12,16 @@
 # node_modules tree — Next's standalone output traces only the files actually
 # reachable, which on Cloud Run means a smaller image and a faster cold start.
 
+# Node 24 (LTS), pinned by digest so a rebuild cannot silently pick up a different
+# image (PRACTICES DSO-3). Node 20 left support in April 2026. Dependabot proposes
+# digest updates as pull requests.
+#
+# Written out on each FROM line rather than once in an ARG: neither Checkov nor
+# Dependabot can see a tag or digest through a build argument, so an ARG made the
+# pin invisible to the scanner (CKV_DOCKER_7) and to the bot that keeps it current.
+
 # ─── deps ─────────────────────────────────────────────────────
-FROM node:20-alpine AS deps
+FROM node:24-alpine@sha256:8a32c8cf649a49915a66e81e7a609223c708d0adabf288ee3f4077d765542f85 AS deps
 WORKDIR /repo
 
 # Only the manifests, so this layer is cached until a dependency actually
@@ -35,7 +43,7 @@ COPY packages/analytics/package.json ./packages/analytics/
 RUN npm ci
 
 # ─── build ────────────────────────────────────────────────────
-FROM node:20-alpine AS builder
+FROM node:24-alpine@sha256:8a32c8cf649a49915a66e81e7a609223c708d0adabf288ee3f4077d765542f85 AS builder
 WORKDIR /repo
 
 COPY --from=deps /repo/node_modules ./node_modules
@@ -56,7 +64,7 @@ ENV JWT_SECRET="build-time-only-never-used-at-runtime"
 RUN npm run build --workspace @ride/api
 
 # ─── runtime ──────────────────────────────────────────────────
-FROM node:20-alpine AS runner
+FROM node:24-alpine@sha256:8a32c8cf649a49915a66e81e7a609223c708d0adabf288ee3f4077d765542f85 AS runner
 WORKDIR /app
 
 ENV NODE_ENV=production
@@ -80,7 +88,7 @@ ENV PORT=8080
 ENV HOSTNAME=0.0.0.0
 EXPOSE 8080
 
-# Node, not curl or wget: neither is present in node:20-alpine, and a probe that
+# Node, not curl or wget: neither is present in node:24-alpine, and a probe that
 # exits -1 because the binary is missing looks exactly like an unhealthy service.
 # This exact mistake made every service in the compose stack permanently
 # unhealthy in a sibling project.

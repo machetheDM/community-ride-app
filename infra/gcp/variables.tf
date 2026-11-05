@@ -73,6 +73,30 @@ variable "github_repository" {
   type        = string
 }
 
+# Numeric ids, because names can be reused: if the repository is renamed or
+# deleted, someone else can register the old name and mint GitHub tokens that
+# carry it. The ids never move. Find them with:
+#   gh api repos/OWNER/REPO --jq '.id, .owner.id'
+variable "github_repository_id" {
+  description = "GitHub's numeric id for the repository allowed to deploy"
+  type        = string
+
+  validation {
+    condition     = can(regex("^[0-9]+$", var.github_repository_id))
+    error_message = "github_repository_id is the numeric id, not the owner/repo name."
+  }
+}
+
+variable "github_repository_owner_id" {
+  description = "GitHub's numeric id for the repository's owner"
+  type        = string
+
+  validation {
+    condition     = can(regex("^[0-9]+$", var.github_repository_owner_id))
+    error_message = "github_repository_owner_id is the numeric id, not the owner's login."
+  }
+}
+
 variable "cloud_run_min_instances" {
   description = <<-EOT
     Minimum Cloud Run instances.
