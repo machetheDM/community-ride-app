@@ -9,6 +9,7 @@
  */
 
 resource "google_bigquery_dataset" "analytics" {
+  # checkov:skip=CKV_GCP_81:Google-managed encryption at rest is used. Customer-managed keys add a Cloud KMS key to run, rotate and pay for, and protect against a threat (Google staff reading the data) that is not in this project's threat model at one-district scale. Revisit if a client or regulator requires it (Scale tier).
   dataset_id                 = var.bigquery_dataset_id
   location                   = var.bigquery_location
   description                = "Completed trip and order events. Identifiers are pseudonymised before insertion."
@@ -39,6 +40,7 @@ resource "google_bigquery_dataset" "analytics" {
  * dashboard query groups or filters by township.
  */
 resource "google_bigquery_table" "trips" {
+  # checkov:skip=CKV_GCP_80:Google-managed encryption at rest is used. Customer-managed keys add a Cloud KMS key to run, rotate and pay for, and protect against a threat (Google staff reading the data) that is not in this project's threat model at one-district scale. Revisit if a client or regulator requires it (Scale tier).
   dataset_id          = google_bigquery_dataset.analytics.dataset_id
   table_id            = "trips"
   description         = "One row per completed or cancelled trip"
@@ -59,6 +61,7 @@ resource "google_bigquery_table" "trips" {
 }
 
 resource "google_bigquery_table" "orders" {
+  # checkov:skip=CKV_GCP_80:Google-managed encryption at rest is used. Customer-managed keys add a Cloud KMS key to run, rotate and pay for, and protect against a threat (Google staff reading the data) that is not in this project's threat model at one-district scale. Revisit if a client or regulator requires it (Scale tier).
   dataset_id          = google_bigquery_dataset.analytics.dataset_id
   table_id            = "orders"
   description         = "One row per delivered or cancelled marketplace order"

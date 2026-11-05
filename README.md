@@ -22,7 +22,7 @@ Built to showcase full-stack TypeScript architecture, clean API design, security
         └───────────────┴───────┬───────┴────────────────┘
                                 │
                     ┌───────────▼────────────┐
-                    │   REST API + WebSocket │
+                    │   REST API + push      │
                     │   • Auth (OTP/JWT)     │
                     │   • Rate limiting      │
                     │   • Zod validation     │
@@ -108,10 +108,11 @@ and refuses to save a model that fails to beat the Google Maps baseline.
 - **Process-local rate limiting** — the limiter is an in-memory fixed window,
   which is per-instance by design. A multi-instance deployment would need a
   shared store; this is stated rather than implied.
-- **Known advisories** — `npm audit` reports outstanding issues in build-time
-  tooling only (Expo CLI's `tar`, the Prisma CLI's `@hono/node-server`,
-  `@xmldom/xmldom`). Clearing them requires an Expo SDK major upgrade. No
-  advisory affects shipped runtime code. This is disclosed, not hidden.
+- **Known advisories, gated** — CI fails on any high or critical advisory unless
+  [`security/audit-exceptions.json`](security/audit-exceptions.json) accepts it
+  with a reason and an expiry date (`scripts/audit-gate.mjs`). Six are accepted
+  today, all in Expo SDK 52 and React Native build tooling, until the SDK upgrade;
+  none is present in the API's deployable build (checked 5 November 2026).
 
 ### Google Maps Platform
 
@@ -211,6 +212,10 @@ accepts a price from the client.
   request to Google — the suite was reaching the internet and nothing said so.
 - **GitHub Actions pipeline**: lint → type-check → test → build, with lint
   enforced at `--max-warnings 0` and type-checking across all four apps
+- **Security workflow, every pull request and weekly** (`.github/workflows/security.yml`):
+  Gitleaks over the full git history, the dependency gate above, Checkov over the
+  Terraform and the Dockerfile, and CodeQL. Every job blocks. Every action is
+  pinned to a commit, and the API image to a digest; Dependabot proposes updates.
 - **End-to-end HTTP tests** for `/api/auth` and `/api/stores` live in
   `apps/api/src/test/e2e`. They require a running server and a seeded database,
   so they are deliberately excluded from CI and run on demand via
@@ -243,7 +248,7 @@ accepts a price from the client.
 All endpoints return consistent JSON and validate input with Zod.
 
 ### `apps/merchant-portal` — Merchant Dashboard
-- Phone OTP login with cookie-based server session
+- Sign-in: being rebuilt as phone OTP with a signed session and a separate admin role
 - **Overview**: revenue metrics, open stores, pending orders, recent activity
 - **Orders**: live order board with status actions (confirm, prepare, ready, deliver, cancel)
 - **My Store**: open/close toggle, store details, ratings
@@ -259,7 +264,7 @@ All endpoints return consistent JSON and validate input with Zod.
 - Driver online/offline toggle
 - Available rides feed with one-tap accept
 - Status flow: Accepted → En Route → Arrived → In Progress → Completed
-- Delivery assignments for riders
+- Delivery status updates by the assigned scooter rider (assigning a rider to an order is not built yet)
 
 ## Tech Stack
 
@@ -293,7 +298,7 @@ PricingConfig baseFare · perKmRate · perMinuteRate · platformFeePercent
 ## Getting Started
 
 ### Prerequisites
-- Node.js 20+
+- Node.js 24 (the version CI and the API image use)
 - PostgreSQL (Supabase or local/Docker)
 - Expo Go for mobile preview
 
@@ -320,13 +325,20 @@ does not have it yet, create it first:
 npm run db:create-schema -w @ride/db
 ```
 
-Then generate the client, push the schema and seed demo data:
+Then generate the client, apply the migrations and seed demo data:
 
 ```bash
-npx prisma generate --schema=packages/db/prisma/schema.prisma
-npx prisma db push --schema=packages/db/prisma/schema.prisma
-npm run db:seed        # creates demo merchant, stores, driver, customer
+npm run db:generate -w @ride/db
+npx prisma migrate deploy --schema=packages/db/prisma/schema.prisma
+npm run db:seed        # demo merchant, stores, driver, rider, customer, admin
 ```
+
+Schema changes go through migrations in `packages/db/prisma/migrations`, not
+`db push`. A database created earlier with `db push` is brought under migrations
+once, by marking the baseline as already applied:
+`npx prisma migrate resolve --applied 0_init --schema=packages/db/prisma/schema.prisma`.
+The generated Prisma client is not committed; turbo regenerates it before
+type-check, lint, test and build.
 
 ### 4. Run web apps
 ```bash

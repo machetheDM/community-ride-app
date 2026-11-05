@@ -8,11 +8,15 @@
  *    or kept by anyone who ever had access, and it does not expire. GitHub Actions
  *    authenticates through Workload Identity Federation instead, exchanging a
  *    short-lived OIDC token from GitHub for a short-lived GCP token. Nothing
- *    persistent is ever issued. Cloud Run uses its attached service account, so no
- *    key exists there either.
+ *    persistent is ever issued. Cloud Run uses its attached service account.
+ *
+ *    **One exception, not yet removed:** Firebase Cloud Messaging is initialised
+ *    from a downloaded service-account key held in Secret Manager (secrets.tf,
+ *    firebase-service-account). The fix is to initialise Firebase Admin from the
+ *    runtime account and delete the key. Tracked as threat-model row PU-2.
  *
  * 2. **Roles are granted per-resource, not per-project.** The API can write to one
- *    BigQuery dataset and read three named secrets — not `roles/bigquery.admin`
+ *    BigQuery dataset and read its five named secrets — not `roles/bigquery.admin`
  *    and not `roles/secretmanager.admin`. A compromised runtime should reach the
  *    minimum that keeps it working.
  */
@@ -84,6 +88,7 @@ resource "google_iam_workload_identity_pool" "github" {
 }
 
 resource "google_iam_workload_identity_pool_provider" "github" {
+  # checkov:skip=CKV_GCP_125:The check accepts only an equality on the `sub` claim. This pool checks the repository by name and by GitHub's numeric repository and owner ids (names can be re-registered; ids cannot), and the only binding requires this repository's main branch (repository_ref below). Pinning `sub` here would also block the read-only plan on pull requests planned for Phase 5.
   workload_identity_pool_id          = google_iam_workload_identity_pool.github.workload_identity_pool_id
   workload_identity_pool_provider_id = "github-oidc"
   display_name                       = "GitHub OIDC"
@@ -92,6 +97,8 @@ resource "google_iam_workload_identity_pool_provider" "github" {
     "google.subject"       = "assertion.sub"
     "attribute.repository" = "assertion.repository"
     "attribute.ref"        = "assertion.ref"
+    # Repository id and ref in one value, so a single binding can require both.
+    "attribute.repository_ref" = "assertion.repository_id + ':' + assertion.ref"
   }
 
   /**
@@ -101,8 +108,16 @@ resource "google_iam_workload_identity_pool_provider" "github" {
    * github.com could present a valid token from this issuer. The provider would
    * accept it, and the binding below would decide the rest. This is the single
    * most important line in the file.
+   *
+   * Checked by numeric id as well as by name (November 2026). A name is reusable:
+   * rename or delete the repository and someone else can register the old name and
+   * mint tokens that carry it. The ids cannot be taken over.
    */
-  attribute_condition = "assertion.repository == '${var.github_repository}'"
+  attribute_condition = join(" && ", [
+    "assertion.repository == '${var.github_repository}'",
+    "assertion.repository_id == '${var.github_repository_id}'",
+    "assertion.repository_owner_id == '${var.github_repository_owner_id}'",
+  ])
 
   oidc {
     issuer_uri = "https://token.actions.githubusercontent.com"
@@ -110,11 +125,14 @@ resource "google_iam_workload_identity_pool_provider" "github" {
 }
 
 /**
- * Which workflows may impersonate the deployer.
+ * Which workflows may impersonate the deployer: this repository's main branch only.
  *
- * Narrowed to the repository *and* to the main branch: a pull request from a fork
- * runs with a different `ref`, so a contributor cannot open a PR that deploys.
- * Restricting to the repository alone would not achieve that.
+ * A pull request runs with ref `refs/pull/N/merge` and a feature branch with its
+ * own `refs/heads/...`, so neither can deploy. Until November 2026 the comment here
+ * said this while the binding named the repository alone, so any branch could have
+ * impersonated a deployer that holds `run.admin` (found by the threat model, row
+ * IN-2). The combined attribute keeps the branch rule even if the pool's condition
+ * is ever widened to admit a second repository.
  */
 resource "google_service_account_iam_member" "github_impersonation" {
   service_account_id = google_service_account.deployer.name
@@ -122,7 +140,7 @@ resource "google_service_account_iam_member" "github_impersonation" {
   member = join("", [
     "principalSet://iam.googleapis.com/",
     google_iam_workload_identity_pool.github.name,
-    "/attribute.repository/${var.github_repository}",
+    "/attribute.repository_ref/${var.github_repository_id}:refs/heads/main",
   ])
 }
 

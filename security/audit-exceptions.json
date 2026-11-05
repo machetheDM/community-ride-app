@@ -1,0 +1,47 @@
+{
+  "$comment": "High and critical npm advisories accepted for a stated reason until a stated date. scripts/audit-gate.mjs fails the build on any high or critical advisory not listed here, and on any entry past its expiry. Checked 5 November 2026: none of these packages is present in the API's Next.js standalone output (apps/api/.next/standalone), which is what the Cloud Run image ships. All six arrive through Expo SDK 52 and React Native 0.76 build tooling, and the fix for each is the Expo SDK upgrade in docs/PLAN.md Phase 2.1.",
+  "exceptions": [
+    {
+      "package": "tar",
+      "severity": "critical",
+      "reason": "Pulled in by @expo/cli and cacache (Expo SDK 52 build tooling). Runs on a developer's machine when building the mobile apps; not in the API image.",
+      "fix": "expo@58 (Phase 2.1)",
+      "expires": "2026-12-31"
+    },
+    {
+      "package": "@expo/cli",
+      "severity": "high",
+      "reason": "The Expo command-line tool itself, flagged through tar, glob and cacache. Build tooling only.",
+      "fix": "expo@58 (Phase 2.1)",
+      "expires": "2026-12-31"
+    },
+    {
+      "package": "cacache",
+      "severity": "high",
+      "reason": "Cache library under @expo/cli, flagged through tar and glob. Build tooling only.",
+      "fix": "expo@58 (Phase 2.1)",
+      "expires": "2026-12-31"
+    },
+    {
+      "package": "postcss",
+      "severity": "high",
+      "reason": "The copy nested under @expo/metro-config (the web apps use their own, current copy). Build tooling only.",
+      "fix": "expo@58 (Phase 2.1)",
+      "expires": "2026-12-31"
+    },
+    {
+      "package": "@xmldom/xmldom",
+      "severity": "high",
+      "reason": "Parses iOS plist files for @expo/plist and xcode during native builds. Build tooling only.",
+      "fix": "expo@58 (Phase 2.1)",
+      "expires": "2026-12-31"
+    },
+    {
+      "package": "image-size",
+      "severity": "high",
+      "reason": "Used by Metro, React Native's bundler, to read image dimensions at build time. Build tooling only.",
+      "fix": "react-native upgrade with expo@58 (Phase 2.1)",
+      "expires": "2026-12-31"
+    }
+  ]
+}
