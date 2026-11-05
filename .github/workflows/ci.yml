@@ -56,6 +56,45 @@ jobs:
         env:
           NODE_ENV: test
 
+  integration:
+    name: Integration Tests (Postgres)
+    runs-on: ubuntu-latest
+    needs: lint
+    # The route handlers against a real database: the access-control holes, the
+    # two-drivers-one-ride race and the lifecycle rules are only proven with real
+    # SQL and real transactions. The database is a throwaway service container;
+    # the suite refuses any host but localhost (apps/api/jest.integration.config.mjs).
+    services:
+      postgres:
+        # Pinned by digest, like every other input (PRACTICES DSO-3). Postgres 16.15.
+        image: postgres:16-alpine@sha256:0cefaabd882e42bcb2a2f3dc56d3ce4770560ba62fd7f197f1a2e008fd5731ab
+        env:
+          POSTGRES_USER: ride
+          POSTGRES_PASSWORD: throwaway
+          POSTGRES_DB: ride_it
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U ride -d ride_it"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+      - uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5
+        with:
+          node-version: 24
+          cache: "npm"
+      - run: npm ci
+      - run: npm run db:generate -w @ride/db
+      - name: Run integration tests
+        # Global setup applies every migration with `prisma migrate deploy`, the
+        # command a deployment runs, so a migration that fails fails here first.
+        run: npm run test:integration -w @ride/api
+        env:
+          NODE_ENV: test
+          TEST_DATABASE_URL: postgresql://ride:throwaway@localhost:5432/ride_it
+
   build:
     name: Build
     runs-on: ubuntu-latest
