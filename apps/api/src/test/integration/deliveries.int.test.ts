@@ -9,12 +9,13 @@ import {
   createUser,
   prisma,
   request,
+  TEST_HANDOVER_CODE,
   type TestUser,
 } from "./helpers";
 
 /**
- * The rider's leg. Riders are assigned directly in these fixtures because
- * dispatch is Phase 2; what is under test is that only the assigned rider can
+ * The rider's leg. Riders are assigned directly in these fixtures (dispatch
+ * has its own suite, dispatch.int.test.ts); what is under test is that only the assigned rider can
  * move a delivery, one step at a time, with the order kept in step.
  */
 
@@ -41,7 +42,7 @@ describe("a delivery", () => {
     expect((await move(deliveryId, rider, { status: "PICKED_UP" })).status).toBe(200);
     expect((await prisma.order.findUniqueOrThrow({ where: { id: orderId } })).status).toBe("OUT_FOR_DELIVERY");
     expect((await move(deliveryId, rider, { status: "EN_ROUTE" })).status).toBe(200);
-    expect((await move(deliveryId, rider, { status: "DELIVERED" })).status).toBe(200);
+    expect((await move(deliveryId, rider, { status: "DELIVERED", handoverCode: TEST_HANDOVER_CODE })).status).toBe(200);
 
     const order = await prisma.order.findUniqueOrThrow({ where: { id: orderId } });
     expect(order.status).toBe("DELIVERED");
@@ -56,7 +57,7 @@ describe("a delivery", () => {
     const rider = await createRider();
     const { deliveryId, orderId } = await readyOrderFor(rider.riderId);
 
-    const res = await move(deliveryId, rider, { status: "DELIVERED" });
+    const res = await move(deliveryId, rider, { status: "DELIVERED", handoverCode: TEST_HANDOVER_CODE });
 
     expect(res.status).toBe(409);
     expect((await prisma.order.findUniqueOrThrow({ where: { id: orderId } })).status).toBe("READY_FOR_PICKUP");

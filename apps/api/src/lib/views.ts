@@ -2,6 +2,7 @@ import type { Prisma } from "@ride/db";
 import { ACTIVE_TRIP_STATUSES, type RideStatus } from "@ride/db/lifecycle";
 import { coarseArea, haversineKm } from "@/lib/geo";
 import { firstName, type OrderRelation, type RideRelation } from "@/lib/policy";
+import { isActiveDelivery, isTrackedDelivery, revealHandoverCode, roundKm } from "@/lib/delivery";
 
 /**
  * What each caller is shown (OWASP API3, excessive data exposure).
@@ -310,7 +311,18 @@ export const orderSelect = {
   createdAt: true,
   updatedAt: true,
   customer: { select: { id: true, name: true, phone: true } },
-  store: { select: { id: true, name: true, logoUrl: true, address: true, merchantId: true } },
+  store: {
+    select: {
+      id: true,
+      name: true,
+      logoUrl: true,
+      address: true,
+      lat: true,
+      lng: true,
+      merchantId: true,
+      complex: { select: { name: true } },
+    },
+  },
   items: {
     select: {
       id: true,
@@ -326,10 +338,22 @@ export const orderSelect = {
       id: true,
       status: true,
       riderId: true,
+      // Read for the customer's view only; `presentOrder` decrypts it for the
+      // customer and copies it nowhere else.
+      handoverCodeEnc: true,
+      assignedAt: true,
       pickedUpAt: true,
+      enRouteAt: true,
       deliveredAt: true,
       failedAt: true,
-      rider: { select: { user: { select: { name: true } } } },
+      rider: {
+        select: {
+          currentLat: true,
+          currentLng: true,
+          user: { select: { name: true } },
+          vehicle: { select: { type: true, color: true, licensePlate: true } },
+        },
+      },
     },
   },
 } satisfies Prisma.OrderSelect;
@@ -338,10 +362,82 @@ export type OrderRecord = Prisma.OrderGetPayload<{ select: typeof orderSelect }>
 
 /**
  * The order as `relation` may see it. The store and the rider see the
- * customer's first name and the delivery address, which they need to do the job;
- * only an admin sees the customer's phone. Nobody sees the merchant id.
+ * customer's first name and the delivery address, which they need to do the job.
+ * The customer's phone goes to the assigned rider only while the delivery is
+ * theirs and active (the rule rides already follow), and to an admin. Nobody sees
+ * the merchant id.
+ *
+ * Delivery (PLAN.md Phase 2):
+ * - The handover code goes to the customer alone, until the delivery is over.
+ *   The rider must hear it at the door; a code the rider's app could read would
+ *   prove nothing.
+ * - The customer sees the rider's first name and vehicle once one is assigned,
+ *   and the rider's position only between pickup and handover: where a rider is
+ *   on their way to the store, or after the job, is not the customer's business.
  */
 export function presentOrder(order: OrderRecord, relation: OrderRelation) {
+  const delivery = order.delivery;
+  const active = delivery ? isActiveDelivery(delivery.status) : false;
+  const tracked = delivery ? isTrackedDelivery(delivery.status) : false;
+  const rider = delivery?.rider ?? null;
+
+  const deliveryForEveryone = delivery
+    ? {
+        id: delivery.id,
+        status: delivery.status,
+        assignedAt: delivery.assignedAt,
+        pickedUpAt: delivery.pickedUpAt,
+        enRouteAt: delivery.enRouteAt,
+        deliveredAt: delivery.deliveredAt,
+        failedAt: delivery.failedAt,
+        rider: rider ? { name: firstName(rider.user.name) } : null,
+      }
+    : null;
+
+  const deliveryForCustomer =
+    delivery && deliveryForEveryone
+      ? {
+          ...deliveryForEveryone,
+          rider:
+            rider && active
+              ? {
+                  name: firstName(rider.user.name),
+                  vehicle: rider.vehicle
+                    ? { type: rider.vehicle.type, color: rider.vehicle.color, licensePlate: rider.vehicle.licensePlate }
+                    : null,
+                  location:
+                    tracked && typeof rider.currentLat === "number" && typeof rider.currentLng === "number"
+                      ? { lat: rider.currentLat, lng: rider.currentLng }
+                      : null,
+                }
+              : deliveryForEveryone.rider,
+          handoverCode:
+            order.status !== "CANCELLED" && delivery.status !== "DELIVERED" && delivery.status !== "FAILED"
+              ? revealHandoverCode(delivery.handoverCodeEnc)
+              : null,
+        }
+      : null;
+
+  const view = presentOrderBase(order);
+  if (relation === "CUSTOMER") return { ...view, delivery: deliveryForCustomer };
+  if (relation === "RIDER") {
+    return {
+      ...view,
+      delivery: deliveryForEveryone,
+      store: { ...view.store, lat: order.store.lat, lng: order.store.lng },
+      customer: active
+        ? { name: firstName(order.customer.name), phone: order.customer.phone }
+        : { name: firstName(order.customer.name) },
+    };
+  }
+  if (relation === "MERCHANT") {
+    return { ...view, delivery: deliveryForEveryone, customer: { name: firstName(order.customer.name) } };
+  }
+  return { ...view, delivery: deliveryForEveryone, customerId: order.customerId, customer: order.customer };
+}
+
+/** The fields every party sees, delivery aside. */
+function presentOrderBase(order: OrderRecord) {
   const base = {
     id: order.id,
     status: order.status,
@@ -370,36 +466,79 @@ export function presentOrder(order: OrderRecord, relation: OrderRelation) {
       address: order.store.address,
     },
     items: order.items,
-    delivery: order.delivery
-      ? {
-          id: order.delivery.id,
-          status: order.delivery.status,
-          pickedUpAt: order.delivery.pickedUpAt,
-          deliveredAt: order.delivery.deliveredAt,
-          failedAt: order.delivery.failedAt,
-          rider: order.delivery.rider ? { name: firstName(order.delivery.rider.user.name) } : null,
-        }
-      : null,
   };
-
-  if (relation === "CUSTOMER") return base;
-  if (relation === "MERCHANT" || relation === "RIDER") {
-    return { ...base, customer: { name: firstName(order.customer.name) } };
-  }
-  return { ...base, customerId: order.customerId, customer: order.customer };
+  return { ...base, store: { ...base.store, complex: order.store.complex?.name ?? null } };
 }
 
-/** A delivery as its rider sees it after a move. */
+/** A delivery as its rider sees it after a move. Never the handover code. */
 export const deliverySelect = {
   id: true,
   orderId: true,
   status: true,
+  assignedAt: true,
   pickedUpAt: true,
+  enRouteAt: true,
   deliveredAt: true,
   failedAt: true,
   failReason: true,
+  handoverAttempts: true,
   updatedAt: true,
 } satisfies Prisma.DeliverySelect;
+
+/**
+ * A waiting delivery as a rider sees it before accepting: enough to choose a job,
+ * nothing that identifies the customer. The store is a public shop, so its name
+ * and address are shown; the drop-off is a suburb label and a distance rounded to
+ * half a kilometre, the same rule the ride list follows.
+ */
+export const availableDeliverySelect = {
+  id: true,
+  createdAt: true,
+  order: {
+    select: {
+      id: true,
+      status: true,
+      customerId: true,
+      deliveryFee: true,
+      deliveryAddress: true,
+      deliveryLat: true,
+      deliveryLng: true,
+      createdAt: true,
+      _count: { select: { items: true } },
+      store: { select: { name: true, address: true, lat: true, lng: true, complex: { select: { name: true } } } },
+    },
+  },
+} satisfies Prisma.DeliverySelect;
+
+export type AvailableDeliveryRecord = Prisma.DeliveryGetPayload<{ select: typeof availableDeliverySelect }>;
+
+export function presentAvailableDelivery(delivery: AvailableDeliveryRecord, distanceToStoreKm: number) {
+  const { order } = delivery;
+  const dropoff = order.deliveryLat && order.deliveryLng ? { lat: order.deliveryLat, lng: order.deliveryLng } : null;
+  return {
+    id: delivery.id,
+    orderStatus: order.status,
+    store: { name: order.store.name, address: order.store.address, complex: order.store.complex?.name ?? null },
+    distanceToStoreKm: roundKm(distanceToStoreKm),
+    dropoffArea: coarseArea(order.deliveryAddress),
+    storeToDropoffKm: dropoff ? roughDistanceKm({ lat: order.store.lat, lng: order.store.lng }, dropoff) : null,
+    itemCount: order._count.items,
+    deliveryFee: order.deliveryFee,
+    waitingSince: order.createdAt,
+  };
+}
+
+/** A scooter rider's own profile: never the ID number, never coordinates. */
+export const riderSelfSelect = {
+  id: true,
+  isOnline: true,
+  isApproved: true,
+  rating: true,
+  totalDeliveries: true,
+  idNumberLast4: true,
+  user: { select: { name: true, avatar: true } },
+  vehicle: { select: { type: true, make: true, model: true, color: true, licensePlate: true, isApproved: true } },
+} satisfies Prisma.RiderSelect;
 
 // ─── Stores ───────────────────────────────────────────────────
 

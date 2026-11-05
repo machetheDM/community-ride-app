@@ -166,6 +166,38 @@ export function isAssignedRider(viewer: Viewer, delivery: { riderId: string | nu
   return Boolean(viewer.riderId) && delivery.riderId === viewer.riderId;
 }
 
+/**
+ * Why a scooter rider may not see or take waiting deliveries, or null when they
+ * may: the driver's rules (an approved operator, an approved vehicle, online),
+ * with the delivery wording.
+ */
+export function riderWorkRefusal(rider: DriverStanding): string | null {
+  const standing = goOnlineRefusal(rider);
+  if (standing) return standing;
+  if (!rider.isOnline) return "Go online to see and accept deliveries";
+  return null;
+}
+
+/**
+ * Why this rider may not accept this delivery, or null when they may.
+ *
+ * One delivery at a time, for the same reason as one ride: a rider holding two
+ * leaves a customer's food going cold at the store. And not your own order,
+ * which is how a delivery fee and a rating would be faked.
+ */
+export function riderAcceptRefusal(
+  rider: DriverStanding,
+  otherActiveDeliveries: number,
+  viewer: Viewer,
+  order: { customerId: string }
+): string | null {
+  const standing = riderWorkRefusal(rider);
+  if (standing) return standing;
+  if (otherActiveDeliveries > 0) return "Finish your current delivery before accepting another";
+  if (order.customerId === viewer.userId) return "You cannot deliver your own order";
+  return null;
+}
+
 // ─── Helpers ──────────────────────────────────────────────────
 
 /**

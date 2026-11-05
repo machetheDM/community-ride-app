@@ -1,5 +1,5 @@
 import { NextRequest } from "next/server";
-import { recordAuditStrict } from "@ride/db";
+import { recordAudit, recordAuditStrict } from "@ride/db";
 import {
   checkDeliveryTransition,
   ORDER_STATUS_FOR_DELIVERY,
@@ -11,8 +11,9 @@ import { auditRefusals, requireViewer } from "@/lib/actor";
 import { parseBody, deliveryStatusSchema } from "@/lib/validate";
 import { ok } from "@/lib/response";
 import { withErrorHandler } from "@/lib/handler";
-import { ConcealedRecordError, ConflictError, NotFoundError } from "@/lib/errors";
+import { ConcealedRecordError, ConflictError, NotFoundError, ValidationError } from "@/lib/errors";
 import { isAssignedRider, type Viewer } from "@/lib/policy";
+import { checkHandoverCode, HANDOVER_MAX_ATTEMPTS } from "@/lib/delivery";
 import { deliverySelect } from "@/lib/views";
 import { sendPushToUser } from "@/lib/notifications";
 import { emitOrderEvent } from "@/lib/analytics";
@@ -36,7 +37,13 @@ import { logger } from "@/lib/logger";
  * a pickup needs an order the store has marked ready, so a rider cannot collect
  * an order that was cancelled a minute ago. Each write is conditional on the
  * status that was read, so two taps on "delivered" record one delivery.
- * Assigning a rider (dispatch) is Phase 2 and is not done here.
+ * Assigning a rider is `deliveries/[id]/accept`.
+ *
+ * DELIVERED needs the customer's 4-digit handover code (PLAN.md Phase 2.5).
+ * Before it, "delivered" was whatever the rider tapped, and a dispute was one
+ * person's word against another's (threat model OD-4). A wrong code is counted
+ * outside the move's transaction, so failing the move cannot roll the count
+ * back; at the limit the delivery can only be closed by support.
  */
 
 const DELIVERY_MESSAGES: Record<string, { title: string; body: string }> = {
@@ -70,22 +77,28 @@ const VERB: Record<DeliveryStatus, string> = {
 export const PATCH = withErrorHandler(async (req: NextRequest, ctx) => {
   const viewer = await requireViewer(req);
   const { id } = await ctx.params;
-  const { status, failReason } = await parseBody(req, deliveryStatusSchema);
+  const { status, failReason, handoverCode } = await parseBody(req, deliveryStatusSchema);
 
   const result = await auditRefusals(
     viewer,
     { action: VERB[status], entityType: "Delivery", entityId: id, detail: { to: status } },
-    () => transition(viewer, id, status, failReason)
+    () => transition(viewer, id, status, failReason, handoverCode)
   );
 
   await afterTransition(result.delivery.orderId, status, result.riderId);
   return ok(result.delivery);
 });
 
-async function transition(viewer: Viewer, id: string, to: DeliveryStatus, failReason: string | undefined) {
+async function transition(
+  viewer: Viewer,
+  id: string,
+  to: DeliveryStatus,
+  failReason: string | undefined,
+  handoverCode: string | undefined
+) {
   const current = await prisma.delivery.findUnique({
     where: { id },
-    select: { id: true, status: true, riderId: true, orderId: true },
+    select: { id: true, status: true, riderId: true, orderId: true, handoverCodeEnc: true, handoverAttempts: true },
   });
   if (!current) throw new NotFoundError("Delivery");
 
@@ -99,6 +112,10 @@ async function transition(viewer: Viewer, id: string, to: DeliveryStatus, failRe
   const check = checkDeliveryTransition(current.status, to, "RIDER");
   if (!check.allowed) throw new ConflictError(`A ${current.status} delivery cannot be moved to ${to}`);
 
+  if (to === "DELIVERED") {
+    await checkHandover(viewer, current, handoverCode ?? "");
+  }
+
   const orderStep = ORDER_STATUS_FOR_DELIVERY[to];
   const now = new Date();
 
@@ -108,6 +125,7 @@ async function transition(viewer: Viewer, id: string, to: DeliveryStatus, failRe
       data: {
         status: to,
         ...(to === "PICKED_UP" ? { pickedUpAt: now } : {}),
+        ...(to === "EN_ROUTE" ? { enRouteAt: now } : {}),
         ...(to === "DELIVERED" ? { deliveredAt: now } : {}),
         ...(to === "FAILED" ? { failedAt: now, failReason: failReason ?? null } : {}),
       },
@@ -159,6 +177,55 @@ async function transition(viewer: Viewer, id: string, to: DeliveryStatus, failRe
   });
 
   return { delivery, riderId };
+}
+
+/**
+ * Refuses a handover unless the rider entered the customer's code.
+ *
+ * A wrong code is counted with a conditional write on the count that was read,
+ * committed on its own: two wrong guesses sent at once count twice, not once, and
+ * the refusal that follows cannot undo the count. Every wrong code is audited,
+ * because a run of them is either a rider at the wrong door or a rider guessing.
+ */
+async function checkHandover(
+  viewer: Viewer,
+  delivery: { id: string; orderId: string; handoverCodeEnc: string | null; handoverAttempts: number },
+  entered: string
+): Promise<void> {
+  const result = checkHandoverCode(delivery.handoverCodeEnc, delivery.handoverAttempts, entered);
+  if (result === "OK") return;
+
+  if (result === "WRONG") {
+    const counted = await prisma.delivery.updateMany({
+      where: { id: delivery.id, handoverAttempts: delivery.handoverAttempts },
+      data: { handoverAttempts: { increment: 1 } },
+    });
+    // A guess that lost the race to another was not counted; it is refused as a
+    // conflict (and audited as one by auditRefusals), so the wrong-code rows in
+    // the log always equal the counter.
+    if (counted.count !== 1) throw new ConflictError("This delivery changed while you were updating it; reload it");
+    const attempts = delivery.handoverAttempts + 1;
+    await recordAudit(prisma, {
+      actorUserId: viewer.userId,
+      actorRole: viewer.role,
+      action: "delivery.handover.wrong_code",
+      entityType: "Delivery",
+      entityId: delivery.id,
+      detail: { orderId: delivery.orderId, attempts },
+    });
+    const left = HANDOVER_MAX_ATTEMPTS - attempts;
+    throw new ValidationError(
+      left > 0
+        ? `That is not the customer's code. ${left} ${left === 1 ? "try" : "tries"} left.`
+        : "That is not the customer's code, and no tries are left. Contact support to close this delivery."
+    );
+  }
+
+  throw new ConflictError(
+    result === "LOCKED"
+      ? "Too many wrong codes. Contact support to close this delivery."
+      : "This delivery has no handover code. Contact support to close it."
+  );
 }
 
 /** Push and analytics after the commit; neither may fail a change that has happened. */

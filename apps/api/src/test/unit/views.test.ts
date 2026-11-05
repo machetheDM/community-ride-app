@@ -1,20 +1,25 @@
 import { describe, it, expect } from "@jest/globals";
 import {
+  availableDeliverySelect,
   availableRideSelect,
   deliverySelect,
   driverAdminSelect,
   driverSelfSelect,
   orderSelect,
+  presentAvailableDelivery,
   presentAvailableRide,
   presentOrder,
   presentRide,
   productPublicSelect,
+  riderSelfSelect,
   rideSelect,
   storeDetailSelect,
   storeListSelect,
+  type AvailableDeliveryRecord,
   type OrderRecord,
   type RideRecord,
 } from "@/lib/views";
+import { encryptField } from "@ride/db/crypto";
 import { coarseArea } from "@/lib/geo";
 import type { RideRelation, OrderRelation } from "@/lib/policy";
 
@@ -38,6 +43,8 @@ const SELECTS = {
   driverSelfSelect,
   orderSelect,
   deliverySelect,
+  availableDeliverySelect,
+  riderSelfSelect,
   productPublicSelect,
   storeListSelect,
   storeDetailSelect,
@@ -89,6 +96,27 @@ function ride(status: RideRecord["status"]): RideRecord {
   } as unknown as RideRecord;
 }
 
+const HANDOVER = "7391";
+const RIDER_AT = { lat: -26.15, lng: 28.15 };
+
+/** The fixture order with its delivery in `status`. */
+function orderWithDelivery(status: string): OrderRecord {
+  return {
+    ...order,
+    delivery: {
+      ...(order.delivery as object),
+      status,
+      handoverCodeEnc: encryptField(HANDOVER),
+      rider: {
+        currentLat: RIDER_AT.lat,
+        currentLng: RIDER_AT.lng,
+        user: { name: "Rider Person" },
+        vehicle: { type: "SCOOTER", color: "Red", licensePlate: "TEST 456 GP" },
+      },
+    },
+  } as unknown as OrderRecord;
+}
+
 const order = {
   id: "order-1",
   status: "PREPARING",
@@ -131,12 +159,16 @@ describe("every select", () => {
     for (const name of NEVER) expect(text).not.toContain(name);
   });
 
-  it("does not read a driver's live position except for the admin roster", () => {
+  it("reads a live position only for the admin roster and an order's delivery rider", () => {
+    // The order read takes the assigned scooter rider's position for the
+    // customer's tracking screen; presentOrder lets it out only to the customer,
+    // between pickup and handover (tested under presentOrder).
     for (const [name, select] of Object.entries(SELECTS)) {
-      if (name === "driverAdminSelect") continue;
+      if (name === "driverAdminSelect" || name === "orderSelect") continue;
       expect(namesIn(select)).not.toContain("currentLat");
     }
     expect(namesIn(driverAdminSelect)).toContain("currentLat");
+    expect(namesIn(orderSelect.delivery.select.rider)).toContain("currentLat");
   });
 
   it("does not read merchantId for any public store response", () => {
@@ -231,11 +263,78 @@ describe("presentOrder", () => {
     }
   });
 
-  it("shows the customer's phone to an admin only", () => {
-    for (const relation of ["CUSTOMER", "MERCHANT", "RIDER"] as const) {
-      expect(namesIn(presentOrder(order, relation))).not.toContain(CUSTOMER_PHONE);
+  it("shows the customer's phone to an admin, and to the rider only while the delivery is theirs and active", () => {
+    for (const relation of ["CUSTOMER", "MERCHANT"] as const) {
+      expect(namesIn(presentOrder(orderWithDelivery("EN_ROUTE"), relation))).not.toContain(CUSTOMER_PHONE);
+    }
+    for (const status of ["ASSIGNED", "PICKED_UP", "EN_ROUTE"]) {
+      expect(namesIn(presentOrder(orderWithDelivery(status), "RIDER"))).toContain(CUSTOMER_PHONE);
+    }
+    for (const status of ["PENDING", "DELIVERED", "FAILED"]) {
+      expect(namesIn(presentOrder(orderWithDelivery(status), "RIDER"))).not.toContain(CUSTOMER_PHONE);
     }
     expect(namesIn(presentOrder(order, "ADMIN"))).toContain(CUSTOMER_PHONE);
+  });
+
+  it("gives the handover code to the customer alone, and only until the delivery is over", () => {
+    for (const status of ["PENDING", "ASSIGNED", "PICKED_UP", "EN_ROUTE"]) {
+      expect(namesIn(presentOrder(orderWithDelivery(status), "CUSTOMER"))).toContain(HANDOVER);
+      for (const relation of ["MERCHANT", "RIDER", "ADMIN"] as const) {
+        const text = namesIn(presentOrder(orderWithDelivery(status), relation));
+        expect(text).not.toContain(HANDOVER);
+        expect(text).not.toContain("handoverCode");
+      }
+    }
+    for (const status of ["DELIVERED", "FAILED"]) {
+      expect(namesIn(presentOrder(orderWithDelivery(status), "CUSTOMER"))).not.toContain(HANDOVER);
+    }
+  });
+
+  it("never copies the encrypted code out, for anyone", () => {
+    for (const relation of relations) {
+      expect(namesIn(presentOrder(orderWithDelivery("EN_ROUTE"), relation))).not.toContain("handoverCodeEnc");
+    }
+  });
+
+  it("shows the customer where the rider is between pickup and handover, and nobody else ever", () => {
+    for (const status of ["PICKED_UP", "EN_ROUTE"]) {
+      expect(namesIn(presentOrder(orderWithDelivery(status), "CUSTOMER"))).toContain(String(RIDER_AT.lat));
+    }
+    for (const status of ["PENDING", "ASSIGNED", "DELIVERED", "FAILED"]) {
+      expect(namesIn(presentOrder(orderWithDelivery(status), "CUSTOMER"))).not.toContain(String(RIDER_AT.lat));
+    }
+    for (const relation of ["MERCHANT", "RIDER", "ADMIN"] as const) {
+      expect(namesIn(presentOrder(orderWithDelivery("EN_ROUTE"), relation))).not.toContain(String(RIDER_AT.lat));
+    }
+  });
+});
+
+describe("presentAvailableDelivery", () => {
+  it("shows the store, a suburb and rounded distances, and nothing that identifies the customer", () => {
+    const record = {
+      id: "del-1",
+      createdAt: new Date(),
+      order: {
+        id: "order-1",
+        status: "CONFIRMED",
+        customerId: "u-cust",
+        deliveryFee: "18.00",
+        deliveryAddress: "12 Test Street, Testville, Fakecity",
+        deliveryLat: -26.21,
+        deliveryLng: 28.05,
+        createdAt: new Date(),
+        _count: { items: 2 },
+        store: { name: "Test Spaza", address: "Shop 1, Testville Plaza", lat: -26.2, lng: 28.04, complex: { name: "Test Mall" } },
+      },
+    } as unknown as AvailableDeliveryRecord;
+
+    const view = presentAvailableDelivery(record, 1.234);
+
+    expect(view).toMatchObject({ dropoffArea: "Testville", distanceToStoreKm: 1.2, itemCount: 2 });
+    expect(view.store).toEqual({ name: "Test Spaza", address: "Shop 1, Testville Plaza", complex: "Test Mall" });
+    const text = namesIn(view);
+    for (const hidden of ["12 Test Street", "u-cust", "-26.21", "customerId"]) expect(text).not.toContain(hidden);
+    expect(((view.storeToDropoffKm ?? 0) * 2) % 1).toBe(0);
   });
 });
 

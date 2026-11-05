@@ -9,6 +9,20 @@ import { getPagination, paginatedResponse } from "@/lib/pagination";
 import { ConflictError, NotFoundError, ValidationError } from "@/lib/errors";
 import { orderListScope, orderRelation, storeOrderRefusal } from "@/lib/policy";
 import { orderSelect, presentOrder } from "@/lib/views";
+import { deliveryFeeFor, newHandoverCode, outsideZoneRefusal } from "@/lib/delivery";
+import { geocodeCached, withMaps } from "@/lib/maps";
+
+/** What pricing and the zone check read about the store and its complex. */
+const storeForOrder = {
+  id: true,
+  isApproved: true,
+  isOpen: true,
+  deliveryFee: true,
+  minimumOrder: true,
+  lat: true,
+  lng: true,
+  complex: { select: { deliveryFee: true, deliveryRadiusKm: true, lat: true, lng: true, isActive: true } },
+} satisfies Prisma.StoreSelect;
 
 /**
  * The caller's orders: a customer's own, a merchant's stores' orders, a rider's
@@ -59,23 +73,41 @@ export const GET = withErrorHandler(async (req: NextRequest) => {
  *   nobody trusts.
  * - All of it is one transaction. A failure halfway leaves no order without its
  *   stock taken, and no stock taken without its order.
+ *
+ * Phase 2 (PLAN.md 2.2, 2.5):
+ * - A store in a shopping complex charges the complex's delivery fee and delivers
+ *   only inside its radius. The drop-off is the point the app sent, or the
+ *   typed address geocoded when it sent none (503 without a Maps key, as booking
+ *   a ride does); an order the rider could not sensibly reach is refused at
+ *   checkout. A stand-alone store keeps its own fee and has no radius.
+ * - Every order gets a 4-digit handover code, stored encrypted, which the
+ *   customer gives the rider at the door.
  */
 export const POST = withErrorHandler(async (req: NextRequest) => {
   const viewer = await requireViewer(req);
   const body = await parseBody(req, orderCreateSchema);
+
+  // Outside the transaction: a geocode is a network call, and a transaction must
+  // not hold its locks while one runs. The store is read again inside it.
+  const dropoff = await deliveryPoint(body);
 
   const order = await auditRefusals(
     viewer,
     { action: "order.create", entityType: "Store", entityId: body.storeId },
     () =>
       prisma.$transaction(async (tx) => {
-        const store = await tx.store.findUnique({
-          where: { id: body.storeId },
-          select: { id: true, isApproved: true, isOpen: true, deliveryFee: true, minimumOrder: true },
-        });
+        const store = await tx.store.findUnique({ where: { id: body.storeId }, select: storeForOrder });
         if (!store || !store.isApproved) throw new NotFoundError("Store");
         const storeRefusal = storeOrderRefusal(store);
         if (storeRefusal) throw new ConflictError(storeRefusal);
+
+        if (store.complex?.isActive) {
+          // Null only if the store joined a complex between the read in
+          // deliveryPoint and this one; asking again is the honest answer.
+          if (!dropoff) throw new ValidationError("We could not place this address on the map; check it and try again");
+          const zone = outsideZoneRefusal(store, dropoff);
+          if (zone) throw new ValidationError(zone, { deliveryAddress: [zone] });
+        }
 
         const ids = body.items.map((item) => item.productId);
         const products = await tx.product.findMany({
@@ -123,8 +155,9 @@ export const POST = withErrorHandler(async (req: NextRequest) => {
           throw new ValidationError(`This store's minimum order is R${new Prisma.Decimal(store.minimumOrder).toFixed(2)}`);
         }
 
-        const deliveryFee = new Prisma.Decimal(store.deliveryFee);
+        const deliveryFee = new Prisma.Decimal(deliveryFeeFor(store));
         const total = subtotal.add(deliveryFee);
+        const handover = newHandoverCode();
 
         const placed = await tx.order.create({
           data: {
@@ -134,12 +167,12 @@ export const POST = withErrorHandler(async (req: NextRequest) => {
             deliveryFee,
             total,
             deliveryAddress: body.deliveryAddress,
-            deliveryLat: body.deliveryLat ?? 0,
-            deliveryLng: body.deliveryLng ?? 0,
+            deliveryLat: dropoff?.lat ?? 0,
+            deliveryLng: dropoff?.lng ?? 0,
             notes: body.notes,
             paymentMethod: body.paymentMethod,
             items: { create: lines },
-            delivery: { create: {} },
+            delivery: { create: { handoverCodeEnc: handover.stored } },
           },
           select: orderSelect,
         });
@@ -159,3 +192,29 @@ export const POST = withErrorHandler(async (req: NextRequest) => {
 
   return created(presentOrder(order, "CUSTOMER"));
 });
+
+/**
+ * The drop-off point: the one the app sent (an autocomplete selection, exact), or
+ * for a store in an active complex, the typed address geocoded, because the zone
+ * check needs a point. A stand-alone store without a point gets none, as before.
+ *
+ * `withMaps` turns a missing Maps key into a 503, and the geocode cache means a
+ * repeated address costs one billable call, not one per order.
+ */
+async function deliveryPoint(body: {
+  storeId: string;
+  deliveryAddress: string;
+  deliveryLat?: number;
+  deliveryLng?: number;
+}): Promise<{ lat: number; lng: number } | null> {
+  if (typeof body.deliveryLat === "number" && typeof body.deliveryLng === "number") {
+    return { lat: body.deliveryLat, lng: body.deliveryLng };
+  }
+  const store = await prisma.store.findUnique({
+    where: { id: body.storeId },
+    select: { complex: { select: { isActive: true } } },
+  });
+  if (!store?.complex?.isActive) return null;
+  const found = await withMaps(() => geocodeCached(body.deliveryAddress));
+  return { lat: found.lat, lng: found.lng };
+}

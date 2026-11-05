@@ -1,6 +1,7 @@
 import { randomBytes, randomInt } from "node:crypto";
 import { NextRequest } from "next/server";
 import type { RideStatus, OrderStatus, DeliveryStatus } from "@ride/db/lifecycle";
+import { encryptField } from "@ride/db/crypto";
 import { prisma } from "@/lib/prisma";
 import { signAuthToken, type UserRoleName } from "@/lib/auth";
 
@@ -81,23 +82,79 @@ export interface TestRider extends TestUser {
   riderId: string;
 }
 
-export async function createRider(): Promise<TestRider> {
+/**
+ * A scooter rider who, by default, may work: approved, online, an approved
+ * scooter, and a position a few hundred metres from the test stores.
+ */
+export async function createRider(
+  options: { approved?: boolean; online?: boolean; vehicleApproved?: boolean | null; lat?: number | null; lng?: number | null } = {}
+): Promise<TestRider> {
+  const { approved = true, online = true, vehicleApproved = true } = options;
   const user = await createUser("RIDER", `Test Rider ${tag()}`);
-  const rider = await prisma.rider.create({ data: { userId: user.userId, isApproved: true, isOnline: true } });
+  const rider = await prisma.rider.create({
+    data: {
+      userId: user.userId,
+      isApproved: approved,
+      isOnline: online,
+      currentLat: options.lat === undefined ? -26.203 : options.lat,
+      currentLng: options.lng === undefined ? 28.043 : options.lng,
+      ...(vehicleApproved === null
+        ? {}
+        : {
+            vehicle: {
+              create: {
+                type: "SCOOTER",
+                make: "Testmake",
+                model: "Testscooter",
+                year: 2022,
+                color: "Red",
+                licensePlate: `TEST ${tag()} GP`,
+                isApproved: vehicleApproved,
+              },
+            },
+          }),
+    },
+  });
   return { ...user, riderId: rider.id };
 }
+
+/** The handover code every fixture order carries. */
+export const TEST_HANDOVER_CODE = "4321";
 
 export interface TestStore {
   merchant: TestUser & { merchantId: string };
   storeId: string;
 }
 
-export async function createStore(options: { approved?: boolean; open?: boolean; minimumOrder?: string } = {}): Promise<TestStore> {
+export async function createStore(
+  options: {
+    approved?: boolean;
+    open?: boolean;
+    minimumOrder?: string;
+    /** Puts the store in a new complex centred on the store. */
+    complex?: { radiusKm?: number; fee?: string; active?: boolean };
+  } = {}
+): Promise<TestStore> {
   const user = await createUser("MERCHANT", `Test Merchant ${tag()}`);
   const merchant = await prisma.merchant.create({ data: { userId: user.userId, isApproved: true } });
+  const complex = options.complex
+    ? await prisma.complex.create({
+        data: {
+          name: `Test Complex ${tag()}`,
+          slug: `test-complex-${tag()}`,
+          address: "1 Test Mall Road, Fakecity",
+          lat: -26.2,
+          lng: 28.04,
+          deliveryRadiusKm: options.complex.radiusKm ?? 5,
+          deliveryFee: options.complex.fee ?? "18.00",
+          isActive: options.complex.active ?? true,
+        },
+      })
+    : null;
   const store = await prisma.store.create({
     data: {
       merchantId: merchant.id,
+      ...(complex ? { complexId: complex.id } : {}),
       name: `Test Spaza ${tag()}`,
       phone: fakePhone(),
       address: "Shop 1, Testville Plaza, Fakecity",
@@ -173,6 +230,7 @@ export async function createOrder(
         create: {
           riderId: options.riderId ?? null,
           status: options.deliveryStatus ?? (options.riderId ? "ASSIGNED" : "PENDING"),
+          handoverCodeEnc: encryptField(TEST_HANDOVER_CODE),
         },
       },
     },
