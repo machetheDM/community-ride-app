@@ -11,7 +11,8 @@
     "test": "jest",
     "test:watch": "jest --watch",
     "test:coverage": "jest --coverage",
-    "test:e2e": "jest --config jest.e2e.config.mjs"
+    "test:e2e": "jest --config jest.e2e.config.mjs",
+    "test:integration": "jest --config jest.integration.config.mjs"
   },
   "dependencies": {
     "@ride/analytics": "*",

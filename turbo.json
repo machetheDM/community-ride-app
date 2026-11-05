@@ -5,7 +5,8 @@
     "build": {
       "dependsOn": [
         "^build",
-        "^db:generate"
+        "^db:generate",
+        "typecheck"
       ],
       "inputs": [
         "$TURBO_DEFAULT$",

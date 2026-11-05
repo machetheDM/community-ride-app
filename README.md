@@ -202,10 +202,18 @@ relation to the actual trip, and a crafted request could book a R0 ride. `POST /
 accepts a price from the client.
 
 ### Testing & CI
-- **132 Jest unit tests** covering validation schemas, pagination bounds, the rate
-  limiter, JWT signing/verification, sanitization, response envelopes, fare
-  calculation, the Maps client, the geocode cache, push transport selection, the
-  arrival-notification distance filter, and analytics pseudonymisation
+- **371 Jest unit tests** (5 November 2026), covering among others the ride, order and
+  delivery lifecycles, the authorisation policy, the response views (a test serialises each
+  one and searches it for ID numbers, licence numbers and push tokens), one-time passwords,
+  portal sessions, JWT algorithm, issuer and audience, the client address behind a proxy,
+  field encryption, fares, the Maps client, push transport selection and analytics privacy
+- **66 integration tests against a real Postgres** (`npm run test:integration -w @ride/api`,
+  and a CI job with a Postgres service container): the route handlers called in-process with
+  real SQL, transactions and migrations. One test for each access-control hole found in the
+  November 2026 audit, and two drivers accepting the same ride at once (exactly one wins).
+  Each route was put back to its old version and the tests run against it: 56 of the 66
+  failed, including every test for a hole. The suite refuses any database host but
+  localhost.
 - **No unit test touches the network.** `src/test/setup.ts` replaces `global.fetch`
   with a stub that throws. This was added after a maps test whose module mock
   silently failed to apply fell through to the real client and issued a live
@@ -230,10 +238,15 @@ accepts a price from the client.
 ## Apps & Features
 
 ### `apps/api` — REST API
-- `POST /api/auth/request-otp` — request 6-digit OTP
-- `POST /api/auth/verify-otp` — verify OTP and receive JWT
+- `POST /api/auth/request-otp` — request a 6-digit code (South African mobiles; capped per
+  phone; 503 in production until an SMS provider is configured, never a false "sent")
+- `POST /api/auth/verify-otp` — verify the code and receive a JWT (five wrong guesses burn a
+  code; repeated failures lock the phone out)
+- `POST /api/auth/logout-all` — revoke every token issued to the caller
 - `GET /api/stores` — list approved stores with search & filters
-- `GET /api/rides` — list rides with pagination & active filter
+- `GET /api/rides` — the caller's own rides (a customer's, or a driver's assigned ones)
+- `GET`, `PATCH /api/rides/[id]` — read or move a ride; only its parties, one checked
+  lifecycle step at a time (two drivers accepting the same ride: one wins, one gets 409)
 - `POST /api/rides` — book a ride (server-priced, coordinates resolved)
 - `POST /api/rides/quote` — fare + ETA preview across every vehicle type
 - `POST /api/maps/geocode` — address → coordinates (cached)
@@ -241,14 +254,25 @@ accepts a price from the client.
 - `POST /api/maps/eta` — travel time and distance
 - `POST /api/maps/autocomplete` — address suggestions; `PUT` resolves the selection
 - `PATCH /api/deliveries/[id]/status` — rider-side delivery lifecycle
-- `GET /api/orders` — list orders with pagination & status filter
-- `POST /api/orders` — place a marketplace order
-- `GET /api/drivers` — list drivers with online/approved filters
+- `GET /api/orders`, `GET /api/orders/[id]` — orders scoped to the caller (customer,
+  store's merchant, assigned rider, or admin)
+- `POST /api/orders` — place an order: priced on the server in one transaction, products
+  must belong to the store, stock checked
+- `GET /api/drivers` — the operator roster, ADMIN only
 
-All endpoints return consistent JSON and validate input with Zod.
+All endpoints return consistent JSON and validate input with Zod. Every route that reads or
+changes someone's data checks the caller's role and status in the database on each request
+(`requireActiveUser`), and responses are built from explicit field lists
+(`apps/api/src/lib/views.ts`), so ID numbers, licence numbers and push tokens never leave the
+API.
 
 ### `apps/merchant-portal` — Merchant Dashboard
-- Sign-in: being rebuilt as phone OTP with a signed session and a separate admin role
+- Sign-in by phone and one-time code, with an HMAC-signed, `Secure`, `httpOnly` session cookie
+  that is re-checked against the database on every request
+- **Two roles:** a merchant sees only their own stores and orders; platform-wide pages
+  (users, drivers, riders, stores, payments, settings, analytics) are ADMIN only, and every
+  view of personal data on them is written to the audit log
+- Security headers and a Content-Security-Policy on every page
 - **Overview**: revenue metrics, open stores, pending orders, recent activity
 - **Orders**: live order board with status actions (confirm, prepare, ready, deliver, cancel)
 - **My Store**: open/close toggle, store details, ratings
@@ -313,7 +337,8 @@ npm install
 DATABASE_URL="postgresql://postgres:password@host:5432/postgres"
 DIRECT_URL="postgresql://postgres:password@host:5432/postgres"
 JWT_SECRET="your-secret-key"
-EXPO_ACCESS_TOKEN="your-expo-token"        # optional for push
+EXPO_PUSH_ACCESS_TOKEN="your-expo-token"   # optional for push
+# The full list, with what each secret protects: .env.example
 ```
 
 ### 3. Database setup
@@ -355,13 +380,20 @@ cd apps/driver-app   && npx expo start
 
 ## Demo Accounts
 
-| Role | Phone |
-|---|---|
-| Merchant | +27 81 000 0001 |
-| Driver | +27 82 000 0002 |
-| Customer | +27 83 000 0003 |
+Created by `npm run db:seed` (`packages/db/prisma/seed.ts`). Placeholder numbers for a local
+database only. The seed does not check which database it is pointed at, so never run it
+against a real one.
 
-OTP is printed to the API console in development (`POST /api/auth/request-otp`).
+| Role | Phone | Signs in to |
+|---|---|---|
+| Admin | +27 81 000 0000 | Merchant portal (platform pages) |
+| Merchant | +27 81 000 0001 | Merchant portal (own stores) |
+| Driver | +27 82 000 0002 | Driver app |
+| Scooter rider | +27 82 000 0003 | Driver app |
+| Customer | +27 83 000 0004 | Customer app |
+
+In development the one-time code is printed to the server console and returned by
+`POST /api/auth/request-otp`; in production neither happens.
 
 ## Testing
 

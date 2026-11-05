@@ -1,7 +1,7 @@
-import { redirect } from "next/navigation";
 import { Users, Wallet } from "lucide-react";
 import { prisma } from "@/lib/prisma";
-import { getSession } from "@/lib/session";
+import { requireAdmin } from "@/lib/session";
+import { auditAdminRead } from "@/lib/audit";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { Card } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
@@ -33,19 +33,25 @@ const roleStatColor: Record<string, "amber" | "blue" | "emerald" | "purple" | "r
 };
 
 export default async function UsersPage() {
-  const session = await getSession();
-  if (!session) redirect("/login");
+  // Every user's phone number: ADMIN only, and the view is recorded.
+  const session = await requireAdmin();
 
   const users = await prisma.user.findMany({
     orderBy: { createdAt: "desc" },
     take: 100,
-    include: {
-      driverProfile: { select: { isApproved: true } },
-      riderProfile: { select: { isApproved: true } },
-      merchantProfile: { select: { isApproved: true } },
+    select: {
+      id: true,
+      name: true,
+      email: true,
+      phone: true,
+      role: true,
+      isVerified: true,
+      isActive: true,
+      walletBalance: true,
       _count: { select: { rides: true, orders: true } },
     },
   });
+  await auditAdminRead(session, "User", users.length);
 
   const roleCounts = users.reduce(
     (acc, u) => {

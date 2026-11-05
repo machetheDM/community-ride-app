@@ -75,6 +75,12 @@ printf '%s' "$JWT_SECRET"    | gcloud secrets versions add jwt-secret --data-fil
 printf '%s' "$MAPS_KEY"      | gcloud secrets versions add google-maps-server-key --data-file=-
 printf '%s' "$(openssl rand -hex 32)" | gcloud secrets versions add analytics-hash-salt --data-file=-
 gcloud secrets versions add firebase-service-account --data-file=./firebase-sa.json
+
+# Phase 1 secrets. Each is generated once and never seen again; the apps refuse to
+# start in production if one is missing, short, or the published dev fallback.
+for s in portal-session-secret otp-hash-key field-encryption-key blind-index-key; do
+  printf '%s' "$(openssl rand -base64 48)" | gcloud secrets versions add "$s" --data-file=-
+done
 ```
 
 `printf` rather than `echo` — `echo` appends a newline that becomes part of the secret and produces

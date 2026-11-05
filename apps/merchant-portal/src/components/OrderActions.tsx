@@ -1,6 +1,6 @@
 "use client";
 
-import { useTransition } from "react";
+import { useState, useTransition } from "react";
 import { Check, X, ChefHat, PackageCheck } from "lucide-react";
 import { updateOrderStatus } from "@/lib/actions";
 
@@ -32,6 +32,7 @@ const variantClasses: Record<Action["variant"], string> = {
 
 export function OrderActions({ orderId, status }: { orderId: string; status: string }) {
   const [isPending, startTransition] = useTransition();
+  const [error, setError] = useState<string | null>(null);
   const actions = NEXT_ACTIONS[status];
 
   if (!actions) {
@@ -44,11 +45,18 @@ export function OrderActions({ orderId, status }: { orderId: string; status: str
 
   const run = (newStatus: string) =>
     startTransition(async () => {
-      await updateOrderStatus(orderId, newStatus);
+      const result = await updateOrderStatus(orderId, newStatus);
+      // The server is the judge; show its refusal rather than pretend it worked.
+      setError("error" in result ? result.error : null);
     });
 
   return (
     <div className="flex flex-wrap gap-2">
+      {error && (
+        <p role="alert" className="w-full text-xs text-red-400">
+          {error}
+        </p>
+      )}
       {actions.map(({ label, status: s, variant, icon: Icon }) => (
         <button
           key={s}

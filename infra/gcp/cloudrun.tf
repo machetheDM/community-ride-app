@@ -98,6 +98,13 @@ resource "google_cloud_run_v2_service" "api" {
         name  = "BIGQUERY_LOCATION"
         value = var.bigquery_location
       }
+      # Cloud Run's front end appends the caller's address to X-Forwarded-For, so
+      # the trustworthy entry is the last one (apps/api/src/lib/client-ip.ts). Set
+      # to 2 if an external load balancer is ever put in front.
+      env {
+        name  = "TRUST_PROXY_HOPS"
+        value = "1"
+      }
 
       # Secrets are mounted by reference. The value never appears in the Terraform
       # configuration, in state, or in the service's environment as plaintext in
@@ -110,6 +117,9 @@ resource "google_cloud_run_v2_service" "api" {
           GOOGLE_MAPS_SERVER_KEY        = "google-maps-server-key"
           ANALYTICS_HASH_SALT           = "analytics-hash-salt"
           FIREBASE_SERVICE_ACCOUNT_JSON = "firebase-service-account"
+          OTP_HASH_KEY                  = "otp-hash-key"
+          FIELD_ENCRYPTION_KEY          = "field-encryption-key"
+          BLIND_INDEX_KEY               = "blind-index-key"
         }
         content {
           name = env.key

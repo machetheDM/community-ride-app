@@ -1,7 +1,7 @@
-import { redirect } from "next/navigation";
 import { MapPin, Phone, Store, Star } from "lucide-react";
 import { prisma } from "@/lib/prisma";
-import { getSession } from "@/lib/session";
+import { requireAdmin } from "@/lib/session";
+import { auditAdminRead } from "@/lib/audit";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { Card } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
@@ -12,8 +12,8 @@ export const metadata = { title: "Stores" };
 export const dynamic = "force-dynamic";
 
 export default async function StoresPage() {
-  const session = await getSession();
-  if (!session) redirect("/login");
+  // Every store and its merchant's phone: ADMIN only, and the view is recorded.
+  const session = await requireAdmin();
 
   const stores = await prisma.store.findMany({
     orderBy: { createdAt: "desc" },
@@ -22,6 +22,7 @@ export default async function StoresPage() {
       _count: { select: { products: true, orders: true } },
     },
   });
+  await auditAdminRead(session, "Store", stores.length);
 
   const columns = [
     {

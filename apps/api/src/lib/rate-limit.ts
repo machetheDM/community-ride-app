@@ -1,5 +1,6 @@
 import { NextRequest } from "next/server";
 import { RateLimitError } from "./errors";
+import { getClientIp } from "./client-ip";
 
 interface RateLimitEntry {
   count: number;
@@ -11,47 +12,74 @@ interface RateLimitEntry {
  *
  * Deliberately process-local: this is a portfolio/demo deployment with a single
  * instance. Behind more than one instance the limit becomes per-instance, so a
- * shared store (Redis, Upstash) would be required for a real rollout.
+ * shared store (Redis, Upstash) would be required for a real rollout. The limits
+ * that guard sign-in do not depend on it: the OTP send cap and lockout are counted
+ * in the database (`packages/db/src/otp.ts`), so they hold across instances and
+ * restarts. This limiter only sheds load before a request reaches them.
+ *
+ * Each limiter has its own store. They used to share one map keyed by address, so
+ * sixty ordinary requests used up the sign-in allowance too, and the limits were
+ * applied to one another's counts.
  *
  * Expired entries are swept on access rather than on a timer. A module-level
- * setInterval would leak across hot reloads and is not portable to the Edge
- * runtime that Next.js middleware executes in, where timer handles have no
- * .unref().
+ * setInterval would leak across hot reloads, and the proxy runs in its own bundle
+ * where a timer has nobody to clear it.
  */
-const store = new Map<string, RateLimitEntry>();
 
-// Bound the map so a flood of unique keys cannot grow it without limit.
-const MAX_TRACKED_KEYS = 10_000;
-
-function sweep(now: number): void {
-  for (const [key, entry] of store) {
-    if (entry.resetAt <= now) store.delete(key);
-  }
-}
+/**
+ * The most keys one limiter tracks. When it is full, the oldest windows go first.
+ *
+ * The old sweep dropped only expired keys, so a flood of fresh keys (one per
+ * spoofed address) grew the map for a whole window (threat model IN-12). Every
+ * entry in a store shares one window length, and a key is re-inserted when its
+ * window restarts, so the map's insertion order is also expiry order: the oldest
+ * entry is the one nearest to expiring anyway, and evicting from the front costs
+ * nothing to find. The cost of eviction is that a flooded limiter forgets its
+ * oldest callers early; the trusted client address (`client-ip.ts`) is what keeps
+ * an attacker from producing that flood in the first place.
+ */
+export const MAX_TRACKED_KEYS = 10_000;
 
 export interface RateLimitOptions {
   windowMs?: number;
   maxRequests?: number;
   keyFn?: (req: NextRequest) => string;
+  /** Defaults to MAX_TRACKED_KEYS; smaller in tests. */
+  maxKeys?: number;
 }
 
-export function rateLimit(opts: RateLimitOptions = {}) {
-  const {
-    windowMs = 60_000,
-    maxRequests = 60,
-    keyFn = (req) =>
-      req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ??
-      req.headers.get("x-real-ip") ??
-      "127.0.0.1",
-  } = opts;
+export interface Limiter {
+  /** Counts one request against the caller's address (or `keyFn`). Throws RateLimitError over the limit. */
+  (req: NextRequest): void;
+  /** Counts one request against an explicit key, such as a phone number. */
+  hit(key: string): void;
+  /** How many keys are tracked now; for tests and diagnostics. */
+  size(): number;
+}
 
-  return function check(req: NextRequest): void {
-    const key = keyFn(req);
+const allStores = new Set<Map<string, RateLimitEntry>>();
+
+export function rateLimit(opts: RateLimitOptions = {}): Limiter {
+  const { windowMs = 60_000, maxRequests = 60, keyFn = (req) => getClientIp(req), maxKeys = MAX_TRACKED_KEYS } = opts;
+  const store = new Map<string, RateLimitEntry>();
+  allStores.add(store);
+
+  function makeRoom(now: number): void {
+    for (const [key, entry] of store) {
+      if (store.size < maxKeys && entry.resetAt > now) return;
+      store.delete(key);
+    }
+  }
+
+  function hit(key: string): void {
     const now = Date.now();
     const entry = store.get(key);
 
     if (!entry || entry.resetAt <= now) {
-      if (store.size >= MAX_TRACKED_KEYS) sweep(now);
+      // Delete before set so the key moves to the end: insertion order stays
+      // expiry order, which is what makes evicting from the front correct.
+      store.delete(key);
+      makeRoom(now);
       store.set(key, { count: 1, resetAt: now + windowMs });
       return;
     }
@@ -61,18 +89,36 @@ export function rateLimit(opts: RateLimitOptions = {}) {
       const retryAfter = Math.ceil((entry.resetAt - now) / 1000);
       throw new RateLimitError(`Too many requests. Retry after ${retryAfter}s.`);
     }
-  };
+  }
+
+  const check = ((req: NextRequest) => hit(keyFn(req))) as Limiter;
+  check.hit = hit;
+  check.size = () => store.size;
+  return check;
 }
 
 /** Test-only hook: clears accumulated state between cases. */
 export function __resetRateLimitStore(): void {
-  store.clear();
+  for (const store of allStores) store.clear();
 }
 
 // Pre-configured limiters
 export const defaultLimiter = rateLimit({ windowMs: 60_000, maxRequests: 60 });
 export const authLimiter = rateLimit({ windowMs: 60_000, maxRequests: 10 });
 export const strictLimiter = rateLimit({ windowMs: 60_000, maxRequests: 5 });
+
+/**
+ * Sign-in limits keyed by phone number rather than by address.
+ *
+ * The address limit stops one caller hammering many phones; these stop many
+ * callers (a botnet, or one caller whose address the front end cannot see)
+ * hammering one phone. They sit above the database caps in `@ride/db/otp`, three
+ * sends in fifteen minutes and a lockout at ten wrong guesses, so a person who
+ * mistypes is stopped by those, with their clearer messages, and these only absorb
+ * bursts that would otherwise race the database counts.
+ */
+export const otpSendPhoneLimiter = rateLimit({ windowMs: 15 * 60_000, maxRequests: 5 });
+export const otpVerifyPhoneLimiter = rateLimit({ windowMs: 15 * 60_000, maxRequests: 15 });
 
 /**
  * Limiters for the Google Maps proxy routes.
