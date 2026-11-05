@@ -1,6 +1,6 @@
 import { NextRequest } from "next/server";
 import { getETA } from "@ride/maps-service";
-import { requireAuth } from "@/lib/auth";
+import { requireActiveUser } from "@/lib/auth";
 import { parseBody, fareQuoteSchema } from "@/lib/validate";
 import { ok } from "@/lib/response";
 import { withErrorHandler } from "@/lib/handler";
@@ -21,7 +21,9 @@ import { calculateFare, loadPricingPolicy, VEHICLE_RATES } from "@/lib/fare";
  * server-side when the ride is actually created.
  */
 export const POST = withErrorHandler(async (req: NextRequest) => {
-  requireAuth(req);
+  // An active account, not just a signature: every quote is a billable Routes
+  // call, and a suspended account's 30-day token must not keep spending them.
+  await requireActiveUser(req);
   mapsLimiter(req);
 
   const { origin, destination } = await parseBody(req, fareQuoteSchema);
