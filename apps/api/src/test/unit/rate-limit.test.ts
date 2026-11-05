@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach } from "@jest/globals";
+import { describe, it, expect, beforeEach, jest } from "@jest/globals";
 import { NextRequest } from "next/server";
 import { rateLimit, __resetRateLimitStore } from "@/lib/rate-limit";
 import { RateLimitError } from "@/lib/errors";
@@ -50,15 +50,21 @@ describe("rateLimit", () => {
   });
 
   it("resets after the window elapses", () => {
-    const check = rateLimit({ windowMs: 10, maxRequests: 1 });
-    const req = reqFrom("10.0.0.6");
-    check(req);
-    expect(() => check(req)).toThrow(RateLimitError);
-    const until = Date.now() + 20;
-    while (Date.now() < until) {
-      /* wait out the window */
+    // A fake clock, not a 10 ms window and a busy-wait. On a loaded machine more
+    // than 10 ms could pass between the first two calls, so the window had already
+    // reset and the "refused" assertion failed: this test went red only when turbo
+    // ran it beside the Next builds (5 November 2026).
+    jest.useFakeTimers();
+    try {
+      const check = rateLimit({ windowMs: 60_000, maxRequests: 1 });
+      const req = reqFrom("10.0.0.6");
+      check(req);
+      expect(() => check(req)).toThrow(RateLimitError);
+      jest.setSystemTime(Date.now() + 60_001);
+      expect(() => check(req)).not.toThrow();
+    } finally {
+      jest.useRealTimers();
     }
-    expect(() => check(req)).not.toThrow();
   });
 
   it("reports a retry-after hint in the message", () => {
