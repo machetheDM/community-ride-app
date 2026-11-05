@@ -177,9 +177,12 @@ export async function updateOrderStatus(orderId: unknown, status: unknown): Prom
 
   const now = new Date();
   const ip = await requestIp();
-  await prisma.$transaction(async (tx) => {
-    await tx.order.update({
-      where: { id: order.id },
+  const changed = await prisma.$transaction(async (tx) => {
+    // Conditional on the status just read (AGENTS.md rule 7): if a rider or a
+    // second tab moved the order in between, this changes nothing rather than
+    // overwriting their change with a decision made on stale data.
+    const { count } = await tx.order.updateMany({
+      where: { id: order.id, status: order.status },
       data: {
         status,
         ...(status === "CONFIRMED" ? { confirmedAt: now } : {}),
@@ -188,6 +191,7 @@ export async function updateOrderStatus(orderId: unknown, status: unknown): Prom
         ...(status === "CANCELLED" ? { cancelledAt: now, cancelledBy: "MERCHANT" } : {}),
       },
     });
+    if (count === 0) return false;
     // In the same transaction: a status change with no record of who made it
     // does not commit.
     await recordAuditStrict(tx, {
@@ -199,7 +203,9 @@ export async function updateOrderStatus(orderId: unknown, status: unknown): Prom
       ip,
       detail: { channel: "portal", from: order.status, to: status },
     });
+    return true;
   });
+  if (!changed) return { error: "This order changed while you were looking at it. Refresh and try again." };
 
   const msg = STATUS_MESSAGES[status];
   if (msg && order.customer.pushToken) {
