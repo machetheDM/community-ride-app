@@ -380,13 +380,20 @@ cd apps/driver-app   && npx expo start
 
 ## Demo Accounts
 
-| Role | Phone |
-|---|---|
-| Merchant | +27 81 000 0001 |
-| Driver | +27 82 000 0002 |
-| Customer | +27 83 000 0003 |
+Created by `npm run db:seed` (`packages/db/prisma/seed.ts`). Placeholder numbers for a local
+database only. The seed does not check which database it is pointed at, so never run it
+against a real one.
 
-OTP is printed to the API console in development (`POST /api/auth/request-otp`).
+| Role | Phone | Signs in to |
+|---|---|---|
+| Admin | +27 81 000 0000 | Merchant portal (platform pages) |
+| Merchant | +27 81 000 0001 | Merchant portal (own stores) |
+| Driver | +27 82 000 0002 | Driver app |
+| Scooter rider | +27 82 000 0003 | Driver app |
+| Customer | +27 83 000 0004 | Customer app |
+
+In development the one-time code is printed to the server console and returned by
+`POST /api/auth/request-otp`; in production neither happens.
 
 ## Testing
 
