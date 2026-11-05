@@ -1,5 +1,6 @@
 import { z, ZodSchema, ZodError } from "zod";
 import { NextRequest } from "next/server";
+import { DELIVERY_STATUSES, ORDER_STATUSES, RIDE_STATUSES } from "@ride/db/lifecycle";
 import { ValidationError } from "./errors";
 
 export async function parseBody<T>(req: NextRequest, schema: ZodSchema<T>): Promise<T> {
@@ -126,34 +127,66 @@ export const fareQuoteSchema = z.object({
   vehicleType: z.enum(["SEDAN", "MINIVAN", "BAKKIE", "SCOOTER", "BICYCLE"]).default("SEDAN"),
 });
 
-export const rideUpdateSchema = z.object({
-  status: z.enum(["ACCEPTED", "DRIVER_ARRIVED", "IN_PROGRESS", "COMPLETED", "CANCELLED"]).optional(),
-  fareActual: z.number().min(0).optional(),
-  cancelReason: z.string().max(500).optional(),
+/** A free-text reason: trimmed, and blank treated as absent so "   " is no reason. */
+const reasonSchema = z
+  .string()
+  .trim()
+  .max(500)
+  .optional()
+  .transform((r) => (r ? r : undefined));
+
+/**
+ * A ride status change. The status must be one the schema knows (anything else
+ * is a 400); whether this caller may make this move from the ride's current
+ * status is `@ride/db/lifecycle`'s question, asked by the route.
+ *
+ * Note the absence of `fareActual`. It used to be read straight from the body,
+ * so the driver could complete a trip at R0 or R5,000 (PLAN.md hole 4). The
+ * server now sets it on completion. Zod strips unknown keys, so a driver app
+ * that still sends the field gets its trip completed at the server's fare, not
+ * an error.
+ */
+export const rideTransitionSchema = z.object({
+  status: z.enum(RIDE_STATUSES),
+  cancelReason: reasonSchema,
+});
+
+const orderItemSchema = z.object({
+  productId: z.string().min(1),
+  quantity: z.number().int().min(1).max(99),
+  notes: z.string().max(200).optional(),
 });
 
 export const orderCreateSchema = z.object({
   storeId: z.string().min(1, "Store ID is required"),
   items: z
-    .array(
-      z.object({
-        productId: z.string().min(1),
-        quantity: z.number().int().min(1).max(99),
-        notes: z.string().max(200).optional(),
-      })
-    )
+    .array(orderItemSchema)
     .min(1, "At least one item is required")
-    .max(50, "Too many items"),
-  deliveryAddress: z.string().min(1, "Delivery address is required"),
-  deliveryLat: z.number().optional(),
-  deliveryLng: z.number().optional(),
+    .max(50, "Too many items")
+    // One line per product. Two lines for the same product would each pass the
+    // stock check on their own and together oversell it.
+    .refine((items) => new Set(items.map((i) => i.productId)).size === items.length, {
+      message: "Each product may appear only once; set its quantity instead",
+    }),
+  deliveryAddress: z.string().min(1, "Delivery address is required").max(300),
+  deliveryLat: z.number().min(-90).max(90).optional(),
+  deliveryLng: z.number().min(-180).max(180).optional(),
   notes: z.string().max(500).optional(),
   paymentMethod: z.enum(["CASH", "CARD", "YOCO", "OZOW", "WALLET"]).default("CASH"),
 });
 
+/**
+ * An order status change. Every order status parses, including the two only the
+ * delivery lifecycle may set, so that asking for OUT_FOR_DELIVERY is refused as
+ * "not your move" (403) rather than as a malformed request.
+ */
 export const orderStatusSchema = z.object({
-  status: z.enum(["CONFIRMED", "PREPARING", "READY_FOR_PICKUP", "OUT_FOR_DELIVERY", "DELIVERED", "CANCELLED"]),
-  cancelReason: z.string().max(500).optional(),
+  status: z.enum(ORDER_STATUSES),
+  cancelReason: reasonSchema,
+});
+
+export const orderListQuerySchema = z.object({
+  status: z.enum(ORDER_STATUSES).optional(),
 });
 
 export const otpRequestSchema = z.object({
@@ -166,8 +199,8 @@ export const otpVerifySchema = z.object({
 });
 
 export const deliveryStatusSchema = z.object({
-  status: z.enum(["ASSIGNED", "PICKED_UP", "EN_ROUTE", "DELIVERED", "FAILED"]),
-  failReason: z.string().max(500).optional(),
+  status: z.enum(DELIVERY_STATUSES),
+  failReason: reasonSchema,
 });
 
 export const pushTokenSchema = z.object({
@@ -176,9 +209,22 @@ export const pushTokenSchema = z.object({
   token: z.string().min(1, "Push token is required").max(512),
 });
 
-export const driverUpdateSchema = z.object({
-  isOnline: z.boolean().optional(),
-  currentLat: z.number().optional(),
-  currentLng: z.number().optional(),
-  heading: z.number().optional(),
-});
+/**
+ * A driver's own status and position.
+ *
+ * The route used to spread the raw body into the update, so a driver could
+ * report latitude 1e9, a heading of "north", or `isOnline: "yes"`, and Prisma
+ * would either store it or throw a 500 (threat model RD-8). A position is a pair
+ * or nothing: a latitude without its longitude is not a place.
+ */
+export const driverUpdateSchema = z
+  .object({
+    isOnline: z.boolean().optional(),
+    currentLat: z.number().min(-90).max(90).optional(),
+    currentLng: z.number().min(-180).max(180).optional(),
+    heading: z.number().min(0).max(360).optional(),
+  })
+  .refine((d) => (d.currentLat === undefined) === (d.currentLng === undefined), {
+    message: "currentLat and currentLng must be sent together",
+    path: ["currentLat"],
+  });
