@@ -1,7 +1,7 @@
-import { redirect } from "next/navigation";
 import { Bike, Star } from "lucide-react";
 import { prisma } from "@/lib/prisma";
-import { getSession } from "@/lib/session";
+import { requireAdmin } from "@/lib/session";
+import { auditAdminRead } from "@/lib/audit";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { Card } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
@@ -13,17 +13,24 @@ export const metadata = { title: "Riders" };
 export const dynamic = "force-dynamic";
 
 export default async function RidersPage() {
-  const session = await getSession();
-  if (!session) redirect("/login");
+  const session = await requireAdmin();
 
+  // An explicit select: `include` read every column, the encrypted ID number and
+  // its hash among them, even though only the last four were shown.
   const riders = await prisma.rider.findMany({
     orderBy: { createdAt: "desc" },
-    include: {
-      user: { select: { name: true, phone: true, email: true } },
-      vehicle: true,
+    select: {
+      id: true,
+      idNumberLast4: true,
+      isOnline: true,
+      isApproved: true,
+      rating: true,
+      user: { select: { name: true, phone: true } },
+      vehicle: { select: { color: true, make: true, model: true, licensePlate: true, year: true } },
       _count: { select: { deliveries: true } },
     },
   });
+  await auditAdminRead(session, "Rider", riders.length);
 
   const columns = [
     {

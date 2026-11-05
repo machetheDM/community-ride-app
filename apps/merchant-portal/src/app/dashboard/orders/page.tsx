@@ -1,7 +1,6 @@
-import { redirect } from "next/navigation";
 import { Clock, MapPin, Package } from "lucide-react";
 import { prisma } from "@/lib/prisma";
-import { getSession } from "@/lib/session";
+import { requireMerchant } from "@/lib/session";
 import { AutoRefresh } from "@/components/AutoRefresh";
 import { OrderActions } from "@/components/OrderActions";
 
@@ -34,7 +33,8 @@ async function getOrders(merchantId: string) {
     orderBy: { createdAt: "desc" },
     take: 50,
     include: {
-      customer: { select: { name: true, phone: true } },
+      // Name only: the page never shows the customer's phone, so it is not read.
+      customer: { select: { name: true } },
       store: { select: { name: true } },
       items: { include: { product: { select: { name: true } } } },
     },
@@ -42,8 +42,9 @@ async function getOrders(merchantId: string) {
 }
 
 export default async function OrdersPage() {
-  const session = await getSession();
-  if (!session) redirect("/login");
+  // The merchant id comes from the database through the session, never from
+  // the request, so this list is always the signed-in merchant's own.
+  const session = await requireMerchant();
 
   const orders = await getOrders(session.merchantId);
   const active = orders.filter((o) => ACTIVE_STATUSES.includes(o.status as never));

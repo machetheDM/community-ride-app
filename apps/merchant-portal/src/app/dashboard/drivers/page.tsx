@@ -1,7 +1,7 @@
-import { redirect } from "next/navigation";
 import { Car, Star } from "lucide-react";
 import { prisma } from "@/lib/prisma";
-import { getSession } from "@/lib/session";
+import { requireAdmin } from "@/lib/session";
+import { auditAdminRead } from "@/lib/audit";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { Card } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
@@ -13,17 +13,27 @@ export const metadata = { title: "Drivers" };
 export const dynamic = "force-dynamic";
 
 export default async function DriversPage() {
-  const session = await getSession();
-  if (!session) redirect("/login");
+  const session = await requireAdmin();
 
-  const drivers = await prisma.driver.findMany({
+  // An explicit select, so the encrypted ID number and its hash are never read
+  // into the page. The licence number is cut to its last four before it goes
+  // anywhere near the markup.
+  const rows = await prisma.driver.findMany({
     orderBy: { createdAt: "desc" },
-    include: {
-      user: { select: { name: true, phone: true, email: true } },
-      vehicle: true,
+    select: {
+      id: true,
+      licenseNumber: true,
+      idNumberLast4: true,
+      isOnline: true,
+      isApproved: true,
+      rating: true,
+      user: { select: { name: true, phone: true } },
+      vehicle: { select: { color: true, make: true, model: true, licensePlate: true, year: true } },
       _count: { select: { rides: true } },
     },
   });
+  const drivers = rows.map(({ licenseNumber, ...driver }) => ({ ...driver, licenceLast4: licenseNumber.slice(-4) }));
+  await auditAdminRead(session, "Driver", drivers.length);
 
   const columns = [
     {
@@ -56,9 +66,16 @@ export default async function DriversPage() {
     },
     {
       key: "license",
-      header: "License",
+      header: "Licence",
       cell: (driver: typeof drivers[number]) => (
-        <span className="text-slate-300 text-xs font-mono">{driver.licenseNumber}</span>
+        <span className="text-slate-300 text-xs font-mono">••• {driver.licenceLast4}</span>
+      ),
+    },
+    {
+      key: "idNumberLast4",
+      header: "ID Number",
+      cell: (driver: typeof drivers[number]) => (
+        <span className="text-slate-300 text-xs font-mono">{driver.idNumberLast4 ? `••• ${driver.idNumberLast4}` : "—"}</span>
       ),
     },
     {

@@ -11,7 +11,10 @@ export function StoreToggle({ storeId, initialOpen }: { storeId: string; initial
     const next = !open;
     setOpen(next);
     startTransition(async () => {
-      await toggleStoreOpen(storeId, next);
+      const result = await toggleStoreOpen(storeId, next);
+      // The switch moved before the server answered; put it back if the server
+      // refused, so it never shows a state the store is not in.
+      if ("error" in result) setOpen(!next);
     });
   };
 

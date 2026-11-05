@@ -3,6 +3,7 @@ import { getSession } from "@/lib/session";
 import { LoginForm } from "./LoginForm";
 
 export const metadata = { title: "Sign In" };
+export const dynamic = "force-dynamic";
 
 export default async function LoginPage() {
   const session = await getSession();
@@ -16,16 +17,19 @@ export default async function LoginPage() {
             M
           </div>
           <h1 className="text-xl font-bold text-slate-100">Merchant Portal</h1>
-          <p className="text-slate-400 text-sm mt-1">Sign in to manage your store orders</p>
+          <p className="text-slate-400 text-sm mt-1">Sign in with a code sent to your phone</p>
         </div>
 
         <div className="bg-[#1e293b] border border-slate-700 rounded-2xl p-6">
           <LoginForm />
         </div>
 
-        <p className="text-center text-slate-500 text-xs mt-6">
-          Demo merchant: <span className="text-slate-400 font-medium">+27 81 000 0001</span>
-        </p>
+        {process.env.NODE_ENV === "development" && (
+          <p className="text-center text-slate-500 text-xs mt-6">
+            Development: the seeded merchant is <span className="text-slate-400 font-medium">+27 81 000 0001</span>, and
+            the code is printed in the portal&apos;s server console.
+          </p>
+        )}
       </div>
     </div>
   );
