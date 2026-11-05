@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { getMapsConfig, isMapsConfigured } from "@/lib/maps";
 import { sendPushToUser } from "@/lib/notifications";
 import { logger } from "@/lib/logger";
+import { haversineKm } from "@/lib/geo";
 
 /**
  * "Your driver is arriving" — the one notification that needs a live ETA.
@@ -53,21 +54,9 @@ function sweep(now: number): void {
   }
 }
 
-/** Great-circle distance in km. */
-export function haversineKm(
-  a: { lat: number; lng: number },
-  b: { lat: number; lng: number }
-): number {
-  const R = 6371;
-  const dLat = ((b.lat - a.lat) * Math.PI) / 180;
-  const dLng = ((b.lng - a.lng) * Math.PI) / 180;
-  const lat1 = (a.lat * Math.PI) / 180;
-  const lat2 = (b.lat * Math.PI) / 180;
-
-  const h =
-    Math.sin(dLat / 2) ** 2 + Math.sin(dLng / 2) ** 2 * Math.cos(lat1) * Math.cos(lat2);
-  return 2 * R * Math.asin(Math.min(1, Math.sqrt(h)));
-}
+// Moved to `geo.ts` so code without a database client can use it; re-exported
+// here because callers and tests already import it from this module.
+export { haversineKm };
 
 /**
  * Called after a driver reports a new position.
@@ -82,9 +71,13 @@ export async function maybeNotifyArrival(
   try {
     if (!isMapsConfigured()) return;
 
-    // Only a ride already accepted and not yet picked up can be "arriving".
+    // Only a ride already accepted and not yet picked up can be "arriving", and
+    // only for an approved driver who is online. The route already ignores an
+    // unapproved driver's position; this repeats the rule here because this is the
+    // function that spends money (the Routes call below) and sends a push, so it
+    // must not depend on every caller remembering (threat model RD-8).
     const ride = await prisma.ride.findFirst({
-      where: { driverId, status: "ACCEPTED" },
+      where: { driverId, status: "ACCEPTED", driver: { isApproved: true, isOnline: true } },
       select: {
         id: true,
         pickupLat: true,

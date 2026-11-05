@@ -40,6 +40,21 @@ export class NotFoundError extends AppError {
   }
 }
 
+/**
+ * The record exists but belongs to someone else.
+ *
+ * Answers exactly like `NotFoundError` (same status, code and message), so a
+ * caller probing ids learns nothing. It is a separate class only so the route
+ * can tell the two apart and write the refusal to the audit log: a missing id is
+ * a typo, a stranger's id is someone looking (PRACTICES.md SEC-4).
+ */
+export class ConcealedRecordError extends NotFoundError {
+  constructor(resource = "Resource") {
+    super(resource);
+    this.name = "ConcealedRecordError";
+  }
+}
+
 export class ConflictError extends AppError {
   constructor(message: string) {
     super(message, 409, "CONFLICT");
