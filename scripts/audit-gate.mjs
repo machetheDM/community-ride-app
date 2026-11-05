@@ -14,7 +14,7 @@
  *   node scripts/audit-gate.mjs            uses `npm audit --omit=dev --json`
  *   node scripts/audit-gate.mjs report.json   reads a saved report instead
  */
-import { execFileSync } from "node:child_process";
+import { execSync } from "node:child_process";
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import path from "node:path";
@@ -26,7 +26,10 @@ function loadReport() {
   const saved = process.argv[2];
   if (saved) return JSON.parse(readFileSync(saved, "utf8"));
   try {
-    return JSON.parse(execFileSync("npm", ["audit", "--omit=dev", "--json"], { cwd: root, encoding: "utf8", shell: process.platform === "win32", maxBuffer: 64 * 1024 * 1024 }));
+    // One fixed command string, no arguments from outside: npm is a .cmd shim on
+    // Windows and needs a shell there, and Node warns (DEP0190) when an argument
+    // array is joined into a shell command.
+    return JSON.parse(execSync("npm audit --omit=dev --json", { cwd: root, encoding: "utf8", maxBuffer: 64 * 1024 * 1024 }));
   } catch (error) {
     // npm audit exits non-zero whenever it finds anything; the report is still on stdout.
     if (error.stdout) return JSON.parse(error.stdout);
