@@ -118,6 +118,12 @@ real personal data.
 - Docker Desktop is not always running; start it before the database tests.
 - Gitleaks 8.30's `[[allowlists]]` did not match as documented; `.gitleaksignore`
   fingerprints did.
+- Jest finds no tests in a checkout whose path contains a dot folder (the agent worktrees
+  under `.claude/worktrees/`): on Windows the backslash before `.claude` is read as a glob
+  escape in `testMatch`. Run there with `-- "--testMatch=**/src/test/unit/**/*.test.ts"`.
+  The main checkout is unaffected.
+- A Dockerfile base image held in an `ARG` is invisible to Checkov (CKV_DOCKER_7) and to
+  Dependabot; write the pinned digest on each `FROM` line.
 
 ## Verification
 

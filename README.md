@@ -313,7 +313,8 @@ npm install
 DATABASE_URL="postgresql://postgres:password@host:5432/postgres"
 DIRECT_URL="postgresql://postgres:password@host:5432/postgres"
 JWT_SECRET="your-secret-key"
-EXPO_ACCESS_TOKEN="your-expo-token"        # optional for push
+EXPO_PUSH_ACCESS_TOKEN="your-expo-token"   # optional for push
+# The full list, with what each secret protects: .env.example
 ```
 
 ### 3. Database setup
