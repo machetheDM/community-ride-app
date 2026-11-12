@@ -15,7 +15,8 @@ the threat model once Phase 1 had closed the holes in section 2.
 |---|---|---|
 | 0. A clean start | Done, 5 November 2026 | Pull request #6 |
 | 1. Close the security holes | Done, 5 November 2026: all eleven holes in section 2 closed, 48 of the threat model's rows DONE | The Phase 1 pull request; `docs/threat-model.md` names the commit for each |
-| 2 onwards | Not started | — |
+| 2. Delivery end to end | In progress. Server side done (12 November 2026): complexes (2.2), dispatch (2.3), handover code (2.5), tracking data (2.6), with the integration suite in CI (2.7); order integrity (2.4) was done in Phase 1. Left: the Expo SDK upgrade (2.1) and the rider and customer screens | The Phase 2 pull request |
+| 3 onwards | Not started | — |
 
 Section 2 below is the audit as it was found on 4 November, kept as the record of what Phase 1
 fixed.

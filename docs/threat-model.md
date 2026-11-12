@@ -2,10 +2,11 @@
 
 **Date:** 4 November 2026 · **Commit audited:** `4fe55a7` (`main`) · **Owner:** the repository owner (`machetheDM`)
 
-**Status, updated 5 November 2026 after Phase 1:** 48 rows DONE, 5 OPEN (AU-4, RD-13 and IN-4
-reduced but not closed; PU-2; IN-11, low), 19 PLANNED (all for features of Phases 2 to 4 that are
-not built yet). Each DONE row cites the commit that closed it. Line numbers in the Evidence column
-still refer to `4fe55a7`, where the hole was found.
+**Status, updated 12 November 2026 for the Phase 2 delivery backend:** 55 rows DONE, 6 OPEN
+(AU-4, RD-13 and IN-4 reduced but not closed; PU-2; IN-11, low; DL-7, no push to riders yet),
+18 PLANNED (features of Phases 3 and 4 that are not built yet). Section 5.3a is new. Each DONE
+row cites the commit that closed it. Line numbers in the Evidence column still refer to
+`4fe55a7`, where the hole was found.
 
 **Rules:** written for ALL-2. Every claim carries a state and a file (ALL-1). SEC-3, SEC-4, SEC-7 and
 ML-5 are applied where cited. All four are still drafts in `../PRACTICES.md`.
@@ -189,6 +190,18 @@ consumption). "Hole n" is the row in PLAN.md §2. Paths under `app/api/` are in 
 | OD-5 | Delivery | E | Someone other than the assigned rider advances a delivery | API1 | Assigned-rider check (`app/api/deliveries/[id]/status/route.ts:68-76`); status parsed by schema (`:54`). Transitions are not ordered yet (1.3), and no rider is ever assigned (2.3) | — | DONE |
 | OD-6 | Orders | I | A merchant sees another merchant's orders | API1 | Queries scoped to `session.merchantId` (`actions.ts:46-51`, `:78-79`; `apps/merchant-portal/src/app/dashboard/orders/page.tsx:31-33`). Only as strong as the cookie (PA-2) | — | DONE |
 
+### 5.3a Dispatch and handover (Phase 2, added 12 November 2026)
+
+| ID | Flow | STRIDE | Threat | API | Evidence | Mitigation | State |
+|---|---|---|---|---|---|---|---|
+| DL-1 | Handover | S, T | A rider guesses the customer's 4-digit code at the door, or scripts guesses | API2, API6 | `apps/api/src/lib/delivery.ts` (`checkHandoverCode`); `app/api/deliveries/[id]/status/route.ts` (`checkHandover`) | Five wrong codes lock the delivery for support, checked before the code so the right code after the limit still fails; each counted by a conditional write and audited | DONE (`132f6d2`) |
+| DL-2 | Handover | I | The rider's app, the store or an admin reads the code and the handover proves nothing | API3 | `presentOrder` in `apps/api/src/lib/views.ts` | Encrypted at rest; decrypted only into the customer's view and only until the delivery ends; unit tests search every other view for it | DONE (`132f6d2`) |
+| DL-3 | Dispatch | I | A rider (or an account posing as one) harvests customers' addresses from the waiting-delivery list | API3 | `app/api/deliveries/available/route.ts`; `presentAvailableDelivery` | Approved, online riders with an approved vehicle only; a suburb and a distance rounded to 0.5 km; name, phone and address only after accepting, and the phone only while the job is active | DONE (`132f6d2`) |
+| DL-4 | Dispatch | T | Two riders take one job, or one rider hoards several | API6 | `app/api/deliveries/[id]/accept/route.ts` | Rider row locked; one conditional write on waiting-with-no-rider; one active delivery per rider; not your own order | DONE (`132f6d2`) |
+| DL-5 | Tracking | I | A customer follows the rider before pickup or after the job, or learns where an off-duty rider lives | API3 | `presentOrder`; `app/api/riders/me/route.ts` | Position shown only between pickup and handover; stored only while online and approved; going offline clears it; no position history kept | DONE (`132f6d2`) |
+| DL-6 | Complexes | T, R | An admin quietly changes what a complex's customers pay, or moves a store between complexes | API5 | `apps/merchant-portal/src/lib/actions.ts` (`createComplex`, `setStoreComplex`) | ADMIN only; validated on the server; audited in the same transaction with the before and after | DONE (`a31e3c7`) |
+| DL-7 | Dispatch | D | Riders are not told about new jobs and orders go cold, because the list is polled | API6 | `deliveries/available` notes push fan-out as a later step | A push to nearby riders when a store confirms an order | OPEN |
+
 ### 5.4 Portal and admin
 
 | ID | Flow | STRIDE | Threat | API | Evidence | Mitigation | State |
@@ -251,7 +264,7 @@ None of this exists. Evidence is "not built" unless a field already exists.
 | PL-8 | Events | T, I | A poster upload is oversized or malformed, or its metadata carries the sender's location; a public bucket lists drafts | API4, API8 | Not built | Size and type caps; re-encode; strip metadata; private bucket with signed reads until published | PLANNED 3.2 |
 | PL-9 | Events | I | Importing a poster "from a link" makes the server fetch internal addresses, such as the metadata server | API7 | Not built | Upload only. If link import is ever added: allow-list, and block private ranges and the metadata host | PLANNED 3.2 |
 | PL-10 | Promotion | I | The Meta page token leaks; a pixel or custom audience shares customers' data without consent | API10 | Not built | Manual posting first; token in Secret Manager when the Graph API is used; no pixel or audience without marketing consent | PLANNED 3.3, 6.1 |
-| PL-11 | Delivery | T | A rider claims "delivered" without the customer; two riders take one order | API6 | Not built; no route writes `Delivery.riderId` | Atomic assignment; 4-digit handover code | PLANNED 2.3, 2.5 |
+| PL-11 | Delivery | T | A rider claims "delivered" without the customer; two riders take one order | API6 | Not built; no route writes `Delivery.riderId` | Atomic assignment; 4-digit handover code | DONE (`132f6d2`): see DL-1 and DL-4 |
 
 ## 6. The poster reader (Phase 4)
 

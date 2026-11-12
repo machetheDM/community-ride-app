@@ -253,7 +253,14 @@ accepts a price from the client.
 - `POST /api/maps/route` — route with polyline
 - `POST /api/maps/eta` — travel time and distance
 - `POST /api/maps/autocomplete` — address suggestions; `PUT` resolves the selection
-- `PATCH /api/deliveries/[id]/status` — rider-side delivery lifecycle
+- `GET /api/deliveries/available` — waiting deliveries within 10 km of an approved, online
+  scooter rider, nearest store first; a suburb and a rounded distance, nothing that
+  identifies the customer
+- `POST /api/deliveries/[id]/accept` — take a waiting delivery (two riders at once: one
+  wins, one gets 409; one job per rider)
+- `PATCH /api/deliveries/[id]/status` — the assigned rider's pickup, en route and handover;
+  "delivered" needs the customer's 4-digit code, and five wrong codes lock it for support
+- `GET`, `PATCH /api/riders/me` — a scooter rider's profile, online status and position
 - `GET /api/orders`, `GET /api/orders/[id]` — orders scoped to the caller (customer,
   store's merchant, assigned rider, or admin)
 - `POST /api/orders` — place an order: priced on the server in one transaction, products
@@ -276,7 +283,10 @@ API.
 - **Overview**: revenue metrics, open stores, pending orders, recent activity
 - **Orders**: live order board with status actions (confirm, prepare, ready, deliver, cancel)
 - **My Store**: open/close toggle, store details, ratings
-- **Admin pages**: Stores, Drivers, Riders, Users, Payments, Settings
+- **Admin pages**: Stores, Complexes, Drivers, Riders, Users, Payments, Settings
+- **Complexes**: an admin adds a shopping complex (one delivery fee and one delivery radius
+  for every store in it) and places stores in it; orders from outside the radius are
+  refused at checkout
 
 ### `apps/customer-app` — Customer App
 - Phone OTP login
