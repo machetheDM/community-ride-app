@@ -17,7 +17,7 @@ const merchant: PortalPrincipal = { role: "MERCHANT", merchantId: "merchant_1" }
 const adminWithoutStore: PortalPrincipal = { role: "ADMIN", merchantId: null };
 const adminWithStore: PortalPrincipal = { role: "ADMIN", merchantId: "merchant_9" };
 
-const ADMIN_PAGES = ["users", "drivers", "riders", "stores", "payments", "settings", "analytics"];
+const ADMIN_PAGES = ["users", "drivers", "riders", "stores", "complexes", "payments", "settings", "analytics"];
 
 describe("mayOpen", () => {
   it.each(ADMIN_PAGES)("refuses a merchant the %s page", (page) => {

@@ -15,6 +15,7 @@ import {
   Building2,
   BarChart3,
   ShieldOff,
+  Landmark,
 } from "lucide-react";
 import { signOut, signOutEverywhere } from "@/lib/actions";
 import type { NavIcon, NavSections } from "@/lib/access";
@@ -26,6 +27,7 @@ const icons: Record<NavIcon, React.ElementType> = {
   store: Store,
   analytics: BarChart3,
   stores: Building2,
+  complexes: Landmark,
   drivers: Car,
   riders: Bike,
   users: Users,

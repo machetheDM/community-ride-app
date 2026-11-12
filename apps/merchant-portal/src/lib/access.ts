@@ -32,6 +32,7 @@ export type NavIcon =
   | "store"
   | "analytics"
   | "stores"
+  | "complexes"
   | "drivers"
   | "riders"
   | "users"
@@ -51,6 +52,7 @@ export const PORTAL_PAGES: readonly PortalPage[] = [
   { href: "/dashboard/store", label: "My Store", icon: "store", access: "merchant" },
   { href: "/dashboard/analytics", label: "Analytics", icon: "analytics", access: "admin" },
   { href: "/dashboard/stores", label: "Stores", icon: "stores", access: "admin" },
+  { href: "/dashboard/complexes", label: "Complexes", icon: "complexes", access: "admin" },
   { href: "/dashboard/drivers", label: "Drivers", icon: "drivers", access: "admin" },
   { href: "/dashboard/riders", label: "Riders", icon: "riders", access: "admin" },
   { href: "/dashboard/users", label: "Users", icon: "users", access: "admin" },
