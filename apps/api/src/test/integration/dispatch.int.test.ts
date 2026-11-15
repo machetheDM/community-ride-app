@@ -5,6 +5,8 @@ import { PATCH as moveDelivery } from "@/app/api/deliveries/[id]/status/route";
 import { GET as getOrder } from "@/app/api/orders/[id]/route";
 import { POST as placeOrder } from "@/app/api/orders/route";
 import { GET as getRiderMe, PATCH as patchRiderMe } from "@/app/api/riders/me/route";
+import { PATCH as confirmOrder } from "@/app/api/orders/[id]/status/route";
+import { sentPushes } from "./fakes/notifications";
 import {
   auditRows,
   call,
@@ -14,6 +16,7 @@ import {
   createStore,
   createUser,
   data,
+  eventually,
   prisma,
   request,
   TEST_HANDOVER_CODE,
@@ -372,5 +375,54 @@ describe("a rider's own status", () => {
     expect(res.status).toBe(200);
     expect(res.text).not.toContain("idNumberEnc");
     expect(res.text).not.toContain("-26.203");
+  });
+});
+
+describe("telling riders about a new job", () => {
+  const confirm = (orderId: string, user: TestUser) =>
+    call(confirmOrder, request("PATCH", `/api/orders/${orderId}/status`, { user, body: { status: "CONFIRMED" } }), {
+      id: orderId,
+    });
+
+  async function riderWithToken(token: string, options: Parameters<typeof createRider>[0] = {}) {
+    const rider = await createRider(options);
+    await prisma.user.update({ where: { id: rider.userId }, data: { pushToken: token } });
+    return rider;
+  }
+
+  it("pushes nearby riders who could take it when the store confirms, with the store and fee only", async () => {
+    const near = `ExponentPushToken[near-${Date.now()}]`;
+    const far = `ExponentPushToken[far-${Date.now()}]`;
+    const offline = `ExponentPushToken[offline-${Date.now()}]`;
+    const busy = `ExponentPushToken[busy-${Date.now()}]`;
+    await riderWithToken(near);
+    await riderWithToken(far, { lat: -25.75, lng: 28.19 });
+    await riderWithToken(offline, { online: false });
+    const busyRider = await riderWithToken(busy);
+    const busyJob = await waitingDelivery();
+    expect((await accept(busyJob.deliveryId, busyRider)).status).toBe(200);
+
+    const { customer, store, orderId, deliveryId } = await waitingDelivery("PENDING");
+    expect((await confirm(orderId, store.merchant)).status).toBe(200);
+
+    await eventually(() => sentPushes.some((p) => p.data?.deliveryId === deliveryId));
+    const push = sentPushes.find((p) => p.data?.deliveryId === deliveryId)!;
+    expect(push.title).toMatch(/New delivery near you/);
+    expect(push.tokens).toContain(near);
+    for (const token of [far, offline, busy]) expect(push.tokens).not.toContain(token);
+    expect(push.body).not.toContain(customer.name);
+    expect(push.body).not.toContain("Test Street");
+  });
+
+  it("does not push riders for an order the store has not confirmed", async () => {
+    const token = `ExponentPushToken[quiet-${Date.now()}]`;
+    await riderWithToken(token);
+    const { store, orderId } = await waitingDelivery("PENDING");
+
+    await call(confirmOrder, request("PATCH", `/api/orders/${orderId}/status`, { user: store.merchant, body: { status: "CANCELLED", cancelReason: "Out of stock" } }), {
+      id: orderId,
+    });
+
+    expect(sentPushes.some((p) => p.tokens.includes(token))).toBe(false);
   });
 });

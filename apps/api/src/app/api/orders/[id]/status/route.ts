@@ -9,7 +9,8 @@ import { withErrorHandler } from "@/lib/handler";
 import { AuthorizationError, ConcealedRecordError, ConflictError, NotFoundError } from "@/lib/errors";
 import { orderRelation, type OrderRelation, type Viewer } from "@/lib/policy";
 import { orderSelect, presentOrder, type OrderRecord } from "@/lib/views";
-import { sendPushToUser } from "@/lib/notifications";
+import { deliveryJobPush, pushTokensOfRidersNear } from "@ride/db/dispatch";
+import { sendPushToMany, sendPushToUser } from "@/lib/notifications";
 import { emitOrderEvent } from "@/lib/analytics";
 import { logger } from "@/lib/logger";
 
@@ -164,6 +165,20 @@ async function afterTransition(order: OrderRecord, actor: OrderActor): Promise<v
     if (msg && actor !== "CUSTOMER") {
       const customer = await prisma.user.findUnique({ where: { id: order.customerId }, select: { pushToken: true } });
       await sendPushToUser(customer?.pushToken, msg.title, msg.body, { orderId: order.id, screen: "orders" });
+    }
+
+    // The store has said yes: the job is now on the riders' list, so tell the
+    // nearby ones who could take it (threat model DL-7). Store and fee only.
+    if (order.status === "CONFIRMED" && order.delivery?.status === "PENDING") {
+      const tokens = await pushTokensOfRidersNear(
+        prisma,
+        { lat: order.store.lat, lng: order.store.lng },
+        { excludeUserId: order.customerId }
+      );
+      if (tokens.length > 0) {
+        const job = deliveryJobPush({ storeName: order.store.name, deliveryFee: order.deliveryFee });
+        await sendPushToMany(tokens, job.title, job.body, { deliveryId: order.delivery.id, screen: "deliveries" });
+      }
     }
   } catch (error) {
     logger.warn("[orders] post-transition notification failed", {

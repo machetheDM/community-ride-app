@@ -15,7 +15,8 @@
     "./crypto": "./src/crypto.ts",
     "./lifecycle": "./src/lifecycle.ts",
     "./otp": "./src/otp.ts",
-    "./session": "./src/session.ts"
+    "./session": "./src/session.ts",
+    "./dispatch": "./src/dispatch.ts"
   },
   "dependencies": {
     "@prisma/adapter-pg": "^7.10.1",

@@ -103,8 +103,8 @@ export function outsideZoneRefusal(store: StoreForPricing, point: { lat: number;
 
 // ─── Dispatch ─────────────────────────────────────────────────
 
-/** How far from a rider a waiting delivery is offered: a scooter's sensible ride to the store. */
-export const DISPATCH_RADIUS_KM = 10;
+/** How far from a rider a waiting delivery is offered; one value with the push to riders. */
+export { DISPATCH_RADIUS_KM } from "@ride/db/dispatch";
 
 /** Delivery statuses during which the rider holds the job (and its customer's details). */
 export const ACTIVE_DELIVERY_STATUSES = ["ASSIGNED", "PICKED_UP", "EN_ROUTE"] as const;

@@ -2,8 +2,8 @@
 
 **Date:** 4 November 2026 · **Commit audited:** `4fe55a7` (`main`) · **Owner:** the repository owner (`machetheDM`)
 
-**Status, updated 12 November 2026 for the Phase 2 delivery backend:** 55 rows DONE, 6 OPEN
-(AU-4, RD-13 and IN-4 reduced but not closed; PU-2; IN-11, low; DL-7, no push to riders yet),
+**Status, updated 12 November 2026 for the Phase 2 delivery backend:** 56 rows DONE, 5 OPEN
+(AU-4, RD-13 and IN-4 reduced but not closed; PU-2; IN-11, low),
 18 PLANNED (features of Phases 3 and 4 that are not built yet). Section 5.3a is new. Each DONE
 row cites the commit that closed it. Line numbers in the Evidence column still refer to
 `4fe55a7`, where the hole was found.
@@ -200,7 +200,7 @@ consumption). "Hole n" is the row in PLAN.md §2. Paths under `app/api/` are in 
 | DL-4 | Dispatch | T | Two riders take one job, or one rider hoards several | API6 | `app/api/deliveries/[id]/accept/route.ts` | Rider row locked; one conditional write on waiting-with-no-rider; one active delivery per rider; not your own order | DONE (`132f6d2`) |
 | DL-5 | Tracking | I | A customer follows the rider before pickup or after the job, or learns where an off-duty rider lives | API3 | `presentOrder`; `app/api/riders/me/route.ts` | Position shown only between pickup and handover; stored only while online and approved; going offline clears it; no position history kept | DONE (`132f6d2`) |
 | DL-6 | Complexes | T, R | An admin quietly changes what a complex's customers pay, or moves a store between complexes | API5 | `apps/merchant-portal/src/lib/actions.ts` (`createComplex`, `setStoreComplex`) | ADMIN only; validated on the server; audited in the same transaction with the before and after | DONE (`a31e3c7`) |
-| DL-7 | Dispatch | D | Riders are not told about new jobs and orders go cold, because the list is polled | API6 | `deliveries/available` notes push fan-out as a later step | A push to nearby riders when a store confirms an order | OPEN |
+| DL-7 | Dispatch | D | Riders are not told about new jobs and orders go cold, because the list is polled | API6 | `packages/db/src/dispatch.ts`; the order status route and the portal action | A push to nearby riders who could take the job when a store confirms an order: store and fee only, riders who are offline, far or busy left out | DONE (this commit) |
 
 ### 5.4 Portal and admin
 
