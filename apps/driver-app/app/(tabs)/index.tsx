@@ -1,8 +1,9 @@
 import React, { useState, useEffect, useCallback, useRef } from "react";
 import {
-  View, Text, StyleSheet, TouchableOpacity, SafeAreaView, Switch,
+  View, Text, StyleSheet, TouchableOpacity, Switch,
   ScrollView, ActivityIndicator, RefreshControl, Alert,
 } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import { useAuth } from "@/context/AuthContext";

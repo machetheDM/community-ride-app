@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from "react";
 import {
   View, Text, StyleSheet, SectionList, TouchableOpacity,
-  SafeAreaView, ActivityIndicator, RefreshControl,
+  ActivityIndicator, RefreshControl,
   Modal, TextInput, KeyboardAvoidingView, Platform, ScrollView, Alert,
 } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { API_URL } from "@/constants/api";
