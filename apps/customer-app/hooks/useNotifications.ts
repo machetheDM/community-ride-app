@@ -6,8 +6,11 @@ import { useRouter } from "expo-router";
 import { API_URL } from "@/constants/api";
 
 Notifications.setNotificationHandler({
+  // expo-notifications 0.31 (SDK 53) split the deprecated `shouldShowAlert` into
+  // the banner and the notification-centre list; both on keeps the old behaviour.
   handleNotification: async () => ({
-    shouldShowAlert: true,
+    shouldShowBanner: true,
+    shouldShowList: true,
     shouldPlaySound: true,
     shouldSetBadge: true,
   }),
