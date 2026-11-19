@@ -267,6 +267,23 @@ accepts a price from the client.
   must belong to the store, stock checked
 - `GET /api/drivers` — the operator roster, ADMIN only
 
+**Events and group trips** (Phase 3; decisions in [`docs/adr`](docs/adr/README.md)):
+- `GET /api/events`, `GET /api/events/[slug]`, `GET /api/events/[slug]/poster` — published
+  events only, with pickup points and the floor price per seat; drafts answer 404
+- `/e/[slug]` — the public event page a Facebook post links to; its link preview is the poster,
+  and it counts views per channel (`?src=fb`) without recording who looked
+- `POST /api/events/[slug]/trip-requests` — a passenger offers a price per seat; below the
+  server's floor is refused, and requests from one pickup point pool into trips of up to 15
+- `GET /api/trip-requests`, `POST …/[id]/cancel`, `POST …/[id]/respond` — my trips, with the
+  operator, plate, boarding code and share link once booked; answer a counter-offer
+- `GET /api/group-trips/available`, `GET /api/group-trips/mine` — offers for an operator whose
+  four documents an admin has verified and who owes under R500; nothing for anyone else
+- `POST /api/group-trips/[id]/accept | counter | check-in | complete` — first acceptance wins
+  (one 200, one 409); one counter per trip; boarding by code; completion records the fee
+- `GET /api/trips/share/[token]` — share-my-trip: the vehicle and plate, never who is on board
+- `GET`, `POST /api/operators/me/documents`, `GET /api/operators/me/statement` — documents
+  (numbers encrypted, last four shown) and fees owed, derived from the ledger
+
 All endpoints return consistent JSON and validate input with Zod. Every route that reads or
 changes someone's data checks the caller's role and status in the database on each request
 (`requireActiveUser`), and responses are built from explicit field lists
@@ -284,6 +301,11 @@ API.
 - **Orders**: live order board with status actions (confirm, prepare, ready, deliver, cancel)
 - **My Store**: open/close toggle, store details, ratings
 - **Admin pages**: Stores, Complexes, Drivers, Riders, Users, Payments, Settings
+- **Venues and events**: partner venues with their agreement, public pickup points, events with
+  a poster stripped of its metadata, publish and cancel, share links per channel, and each
+  event's funnel (views, requests, seats booked, fees against promotion spend)
+- **Operators**: verify or reject documents, each operator's statement, and payments and
+  adjustments recorded as ledger events (no stored balance)
 - **Complexes**: an admin adds a shopping complex (one delivery fee and one delivery radius
   for every store in it) and places stores in it; orders from outside the radius are
   refused at checkout
@@ -298,7 +320,7 @@ API.
 - Driver online/offline toggle
 - Available rides feed with one-tap accept
 - Status flow: Accepted → En Route → Arrived → In Progress → Completed
-- Delivery status updates by the assigned scooter rider (assigning a rider to an order is not built yet)
+- Scooter riders: nearby delivery jobs, accept, pickup, en route, and handover by the customer's code
 
 ## Tech Stack
 
