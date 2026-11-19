@@ -1,7 +1,11 @@
 import { Tabs } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
+import { useAuth } from "@/context/AuthContext";
 
 export default function TabLayout() {
+  // Event trips are for drivers; a scooter rider never sees the tab.
+  const { user } = useAuth();
+  const isDriver = user?.role === "DRIVER";
   return (
     <Tabs
       screenOptions={{
@@ -24,6 +28,16 @@ export default function TabLayout() {
           title: "Dashboard",
           tabBarIcon: ({ color, size }) => (
             <Ionicons name="home" size={size} color={color} />
+          ),
+        }}
+      />
+      <Tabs.Screen
+        name="trips"
+        options={{
+          title: "Events",
+          href: isDriver ? undefined : null,
+          tabBarIcon: ({ color, size }) => (
+            <Ionicons name="bus" size={size} color={color} />
           ),
         }}
       />
