@@ -703,6 +703,7 @@ model Event {
   visits       EventVisit[]
   tripRequests TripRequest[]
   groupTrips   GroupTrip[]
+  modelCalls   ModelCall[]
 
   @@index([status, startsAt])
   @@schema("ride")
@@ -923,5 +924,57 @@ model LedgerEntry {
   /// A trip's fee is recorded once, however many times completion is retried.
   @@unique([kind, sourceType, sourceId])
   @@index([operatorUserId, createdAt])
+  @@schema("ride")
+}
+
+// ─────────────────────────────────────────────
+// Language-model calls (docs/PLAN.md Phase 4, ADR 0008)
+// ─────────────────────────────────────────────
+
+enum ModelCallOutcome {
+  /// The model answered and its answer passed the checks (some fields may be set aside).
+  OK
+  /// The model answered, and the answer was discarded whole.
+  INVALID
+  /// No answer: refused, timed out, no credentials, or the call failed.
+  ERROR
+
+  @@schema("ride")
+}
+
+/// One call to a language model, kept whatever happened (PRACTICES ML-7): what
+/// it cost in time, tokens and money, under which prompt version. For a poster
+/// read it also holds the checked proposal, which reaches an event only when an
+/// admin applies it to a draft. The model's raw answer is not kept: what an
+/// admin needs is the proposal and what was set aside, with the reason.
+model ModelCall {
+  id            String           @id @default(cuid())
+  /// "poster.read"
+  feature       String
+  model         String
+  promptVersion String
+  latencyMs     Int
+  inputTokens   Int?
+  outputTokens  Int?
+  /// US dollars at the configured price; null when no price is configured.
+  costUsd       Decimal?         @db.Decimal(12, 6)
+  outcome       ModelCallOutcome
+  errorKind     String?
+  eventId       String?
+  event         Event?           @relation(fields: [eventId], references: [id])
+  posterSha256  String?
+  /// The fields that survived the checks, cleaned.
+  proposal      Json?
+  /// Fields withheld from the proposal: { field, reason, excerpt }[].
+  setAside      Json?
+  /// Why the answer was discarded or the call failed, in words for the admin.
+  problem       String?
+  requestedById String
+  appliedAt     DateTime?
+  appliedById   String?
+  createdAt     DateTime         @default(now())
+
+  @@index([createdAt])
+  @@index([eventId, createdAt])
   @@schema("ride")
 }

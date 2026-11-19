@@ -1,0 +1,24 @@
+{
+  "name": "@ride/poster-reader",
+  "version": "0.1.0",
+  "private": true,
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "eval": "tsx eval/run.ts",
+    "eval:live": "tsx eval/live.ts",
+    "cost": "tsx scripts/day-cost.ts"
+  },
+  "dependencies": {
+    "@opentelemetry/api": "^1.9.1",
+    "google-auth-library": "^10.9.1",
+    "zod": "^4.4.3"
+  },
+  "devDependencies": {
+    "@types/node": "^20",
+    "tsx": "^4.23.15",
+    "typescript": "^5.8.0"
+  }
+}

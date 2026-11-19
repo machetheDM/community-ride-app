@@ -12,6 +12,7 @@
   "dependencies": {
     "@ride/analytics": "*",
     "@ride/db": "*",
+    "@ride/poster-reader": "*",
     "@ride/push-service": "*",
     "@ride/types": "*",
     "clsx": "^2.1.1",

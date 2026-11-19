@@ -18,6 +18,7 @@
     "@ride/analytics": "*",
     "@ride/db": "*",
     "@ride/maps-service": "*",
+    "@ride/poster-reader": "*",
     "@ride/push-service": "*",
     "@ride/types": "*",
     "jsonwebtoken": "^9.0.3",
