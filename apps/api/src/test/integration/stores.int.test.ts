@@ -15,8 +15,11 @@ afterAll(async () => {
 describe("threat model finding 13: store responses", () => {
   it("do not carry the merchant id in the list, the value that forged the old portal cookie", async () => {
     const { storeId, merchant } = await createStore();
+    // The list returns 50 stores at most, best-rated first, and the other suites'
+    // stores share this database: search for this store so it is in the page.
+    const { name } = await prisma.store.findUniqueOrThrow({ where: { id: storeId }, select: { name: true } });
 
-    const res = await call(listStores, request("GET", "/api/stores"));
+    const res = await call(listStores, request("GET", `/api/stores?search=${encodeURIComponent(name)}`));
 
     expect(res.status).toBe(200);
     expect((res.body.data as { id: string }[]).some((s) => s.id === storeId)).toBe(true);
