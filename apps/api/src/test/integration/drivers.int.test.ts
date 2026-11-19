@@ -68,18 +68,41 @@ describe("threat model finding 6: drivers' live locations", () => {
     }
   });
 
-  it("are not in the customer's view of their own active trip", async () => {
+  // Changed on purpose in Phase 2 (November 2026). Phase 1 hid the position from
+  // everyone but an admin, which also took the car off the customer's own tracking
+  // map. A ride's customer now sees it while the trip is active, and at no other
+  // time; nobody else sees it at all.
+  it("reach the ride's own customer during the trip, and stop when it ends", async () => {
     const customer = await createUser();
     const driver = await createDriver({ lat: -26.111111, lng: 28.222222 });
     const ride = await createRide(customer.userId, { status: "ACCEPTED", driverId: driver.driverId });
+    const view = () => call(getRide, request("GET", `/api/rides/${ride.id}`, { user: customer }), { id: ride.id });
 
-    const res = await call(getRide, request("GET", `/api/rides/${ride.id}`, { user: customer }), { id: ride.id });
+    const during = await view();
+    expect(during.status).toBe(200);
+    expect((data(during).driver as { location: unknown }).location).toEqual({ lat: -26.111111, lng: 28.222222 });
+    expect(during.text).not.toContain("currentLat");
+    expect(during.text).toContain(driver.phone);
 
-    expect(res.status).toBe(200);
-    expect(res.text).not.toContain("currentLat");
-    expect(res.text).not.toContain("-26.111111");
-    // What the customer does get during the trip: who, how to call, which car.
-    expect(res.text).toContain(driver.phone);
+    await prisma.ride.update({ where: { id: ride.id }, data: { status: "COMPLETED" } });
+    const after = await view();
+    expect(after.text).not.toContain("-26.111111");
+    expect(after.text).not.toContain(driver.phone);
+  });
+
+  it("are not shown to another customer, or to a customer whose ride nobody has accepted", async () => {
+    const customer = await createUser();
+    const other = await createUser();
+    const driver = await createDriver({ lat: -26.555555, lng: 28.666666 });
+    const accepted = await createRide(customer.userId, { status: "ACCEPTED", driverId: driver.driverId });
+    const waiting = await createRide(other.userId);
+
+    const stranger = await call(getRide, request("GET", `/api/rides/${accepted.id}`, { user: other }), { id: accepted.id });
+    const unaccepted = await call(getRide, request("GET", `/api/rides/${waiting.id}`, { user: other }), { id: waiting.id });
+
+    expect(stranger.status).toBe(404);
+    expect(stranger.text).not.toContain("-26.555555");
+    expect(unaccepted.text).not.toContain("-26.555555");
   });
 
   it("are not in the driver's own profile either", async () => {

@@ -80,6 +80,10 @@ export const rideSelect = {
     select: {
       id: true,
       rating: true,
+      // Read for the customer's map during an active trip only; presentRide lets
+      // it out as `location` to the ride's own customer and nowhere else.
+      currentLat: true,
+      currentLng: true,
       user: { select: { name: true, phone: true, avatar: true } },
       vehicle: { select: { type: true, make: true, model: true, color: true, licensePlate: true } },
     },
@@ -147,6 +151,13 @@ export function presentRide(ride: RideRecord, relation: RideRelation) {
               rating: driver.rating,
               user: { name: driver.user.name, phone: driver.user.phone, avatar: driver.user.avatar },
               vehicle: driver.vehicle,
+              // Where the car is, while it is coming for or carrying this customer:
+              // what the tracking map is for. Not before a driver accepts, and not
+              // after the trip, when it would be where the driver went next.
+              location:
+                typeof driver.currentLat === "number" && typeof driver.currentLng === "number"
+                  ? { lat: driver.currentLat, lng: driver.currentLng }
+                  : null,
             }
           : {
               id: driver.id,
@@ -563,8 +574,33 @@ const storePublicFields = {
   deliveryFee: true,
   minimumOrder: true,
   rating: true,
+  // Read to work out what the customer will pay; presentStore returns the fee
+  // that applies and the complex's name and radius, not the raw row.
+  complex: { select: { name: true, deliveryFee: true, deliveryRadiusKm: true, isActive: true } },
   _count: { select: { products: true, orders: true } },
 } satisfies Prisma.StoreSelect;
+
+type StoreFee = Prisma.Decimal | string | number;
+
+/**
+ * A public store as the customer app shows it: the delivery fee that will be
+ * charged. A store in an active complex charges the complex's fee (PLAN.md Phase
+ * 2.2), so returning the store's own would quote one price and bill another.
+ */
+export function presentStore<
+  T extends {
+    deliveryFee: StoreFee;
+    complex: { name: string; deliveryFee: StoreFee; deliveryRadiusKm: number; isActive: boolean } | null;
+  },
+>(store: T) {
+  const { complex, ...rest } = store;
+  const active = complex?.isActive ? complex : null;
+  return {
+    ...rest,
+    deliveryFee: active ? active.deliveryFee : store.deliveryFee,
+    complex: active ? { name: active.name, deliveryRadiusKm: active.deliveryRadiusKm } : null,
+  };
+}
 
 /** Public product fields. Not the stock count, which is the store's business. */
 export const productPublicSelect = {

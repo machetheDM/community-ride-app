@@ -426,3 +426,36 @@ describe("telling riders about a new job", () => {
     expect(sentPushes.some((p) => p.tokens.includes(token))).toBe(false);
   });
 });
+
+describe("an order sent without a delivery point", () => {
+  const orderAt = (user: TestUser, storeId: string, productId: string, point: Record<string, number>) =>
+    call(
+      placeOrder,
+      request("POST", "/api/orders", {
+        user,
+        body: { storeId, items: [{ productId, quantity: 1 }], deliveryAddress: "3 Test Lane, Testville, Fakecity", ...point },
+      })
+    );
+
+  it("treats the old app's 0,0 placeholder as no point, not as a place 6,000 km from the complex", async () => {
+    const customer = await createUser();
+    const { storeId } = await createStore({ complex: {} });
+    const product = await createProduct(storeId);
+
+    const res = await orderAt(customer, storeId, product.id, { deliveryLat: 0, deliveryLng: 0 });
+
+    // No point means the address must be geocoded for the zone check, and this
+    // suite has no Maps key: 503, the answer booking a ride gives. Not 400
+    // "outside the delivery zone".
+    expect(res.status).toBe(503);
+  });
+
+  it("still places an order at a stand-alone store, which has no zone to check", async () => {
+    const customer = await createUser();
+    const { storeId } = await createStore();
+    const product = await createProduct(storeId);
+
+    expect((await orderAt(customer, storeId, product.id, { deliveryLat: 0, deliveryLng: 0 })).status).toBe(201);
+    expect((await orderAt(customer, storeId, product.id, {})).status).toBe(201);
+  });
+});

@@ -2,7 +2,7 @@
 
 **Date:** 4 November 2026 · **Commit audited:** `4fe55a7` (`main`) · **Owner:** the repository owner (`machetheDM`)
 
-**Status, updated 12 November 2026 for the Phase 2 delivery backend:** 56 rows DONE, 5 OPEN
+**Status, updated 12 November 2026 for the Phase 2 delivery backend:** 57 rows DONE, 5 OPEN
 (AU-4, RD-13 and IN-4 reduced but not closed; PU-2; IN-11, low),
 18 PLANNED (features of Phases 3 and 4 that are not built yet). Section 5.3a is new. Each DONE
 row cites the commit that closed it. Line numbers in the Evidence column still refer to
@@ -178,6 +178,7 @@ consumption). "Hole n" is the row in PLAN.md §2. Paths under `app/api/` are in 
 | RD-11 | Rides | R | An operator denies accepting, a customer denies cancelling, and nothing records who did what | — | Only timestamps (`rides/[id]/route.ts:63-65`) | Audit table for every transition and admin action (SEC-4) | DONE (`d086691`): every move audited in its transaction |
 | RD-12 | Maps | D | An open proxy in front of billed Google APIs | API4 | Server-only key, separate from the app's render key (`apps/api/src/lib/maps.ts:9`, `:34`; `apps/customer-app/app.config.js:7-16`); proxy routes need a token and a per-route limit (`app/api/maps/geocode/route.ts:19-21`; `rate-limit.ts:89-90`) | — | DONE |
 | RD-13 | Maps | D | One account can still run up the Maps bill: limits key on the spoofable header; booking geocodes and routes with no Maps limiter; location updates call routes (RD-8); no quota on the server key in Terraform; the budget only alerts | API4 | `rate-limit.ts:42-45`; `rides/route.ts:61`, `:77-84`; `infra/gcp/main.tf:93-120` | Key signed-in limits on `userId`; per-user daily Maps cap; API quota on the server key | OPEN, reduced: limits key on the trusted address (`459c76e`); booking still has no Maps limiter |
+| RD-14 | Rides | I | A customer books a ride to watch where an operator is. Phase 1 hid operators' positions from everyone but an admin, which also took the car off the customer's own tracking map; Phase 2 gives it back to the ride's customer | API3 | `presentRide` in `apps/api/src/lib/views.ts`; `drivers.int.test.ts` | The position goes only to the ride's own customer, only while the trip is active (accepted to in progress), never before a driver accepts or after the trip ends, and to no other customer. Residual: a customer with an accepted ride sees the car approach, which is what ride-hailing is; the booking is tied to a verified phone and audited | DONE (Phase 2), residual accepted |
 
 ### 5.3 Orders and delivery
 
@@ -200,7 +201,7 @@ consumption). "Hole n" is the row in PLAN.md §2. Paths under `app/api/` are in 
 | DL-4 | Dispatch | T | Two riders take one job, or one rider hoards several | API6 | `app/api/deliveries/[id]/accept/route.ts` | Rider row locked; one conditional write on waiting-with-no-rider; one active delivery per rider; not your own order | DONE (`132f6d2`) |
 | DL-5 | Tracking | I | A customer follows the rider before pickup or after the job, or learns where an off-duty rider lives | API3 | `presentOrder`; `app/api/riders/me/route.ts` | Position shown only between pickup and handover; stored only while online and approved; going offline clears it; no position history kept | DONE (`132f6d2`) |
 | DL-6 | Complexes | T, R | An admin quietly changes what a complex's customers pay, or moves a store between complexes | API5 | `apps/merchant-portal/src/lib/actions.ts` (`createComplex`, `setStoreComplex`) | ADMIN only; validated on the server; audited in the same transaction with the before and after | DONE (`a31e3c7`) |
-| DL-7 | Dispatch | D | Riders are not told about new jobs and orders go cold, because the list is polled | API6 | `packages/db/src/dispatch.ts`; the order status route and the portal action | A push to nearby riders who could take the job when a store confirms an order: store and fee only, riders who are offline, far or busy left out | DONE (this commit) |
+| DL-7 | Dispatch | D | Riders are not told about new jobs and orders go cold, because the list is polled | API6 | `packages/db/src/dispatch.ts`; the order status route and the portal action | A push to nearby riders who could take the job when a store confirms an order: store and fee only, riders who are offline, far or busy left out | DONE (`417401c`) |
 
 ### 5.4 Portal and admin
 

@@ -207,8 +207,15 @@ async function deliveryPoint(body: {
   deliveryLat?: number;
   deliveryLng?: number;
 }): Promise<{ lat: number; lng: number } | null> {
-  if (typeof body.deliveryLat === "number" && typeof body.deliveryLng === "number") {
-    return { lat: body.deliveryLat, lng: body.deliveryLng };
+  // 0,0 is the placeholder the customer app sent for "no point" until November
+  // 2026 (a spot in the Gulf of Guinea). Taken as a real point, the zone check
+  // would refuse every order from a complex as thousands of km away.
+  const sentPoint =
+    typeof body.deliveryLat === "number" &&
+    typeof body.deliveryLng === "number" &&
+    !(body.deliveryLat === 0 && body.deliveryLng === 0);
+  if (sentPoint) {
+    return { lat: body.deliveryLat as number, lng: body.deliveryLng as number };
   }
   const store = await prisma.store.findUnique({
     where: { id: body.storeId },

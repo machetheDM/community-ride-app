@@ -3,7 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { ok } from "@/lib/response";
 import { withErrorHandler } from "@/lib/handler";
 import { NotFoundError } from "@/lib/errors";
-import { storeDetailSelect } from "@/lib/views";
+import { presentStore, storeDetailSelect } from "@/lib/views";
 
 /**
  * Public store page: the store's shop-window fields and its menu. No
@@ -18,5 +18,5 @@ export const GET = withErrorHandler(async (_req: NextRequest, ctx) => {
   });
   if (!store) throw new NotFoundError("Store");
 
-  return ok(store);
+  return ok(presentStore(store));
 });

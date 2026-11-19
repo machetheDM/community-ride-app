@@ -52,6 +52,7 @@ const SELECTS = {
 
 const CUSTOMER_PHONE = "+27000000101";
 const DRIVER_PHONE = "+27000000202";
+const DRIVER_AT = { lat: -26.123, lng: 28.123 };
 
 function ride(status: RideRecord["status"]): RideRecord {
   return {
@@ -88,6 +89,8 @@ function ride(status: RideRecord["status"]): RideRecord {
         : {
             id: "d-1",
             rating: 4.8,
+            currentLat: DRIVER_AT.lat,
+            currentLng: DRIVER_AT.lng,
             user: { name: "Sipho Fake", phone: DRIVER_PHONE, avatar: null },
             vehicle: { type: "SEDAN", make: "Toyota", model: "Corolla", color: "White", licensePlate: "TEST 123 GP" },
           },
@@ -159,12 +162,12 @@ describe("every select", () => {
     for (const name of NEVER) expect(text).not.toContain(name);
   });
 
-  it("reads a live position only for the admin roster and an order's delivery rider", () => {
+  it("reads a live position only for the admin roster, a ride's driver and an order's delivery rider", () => {
     // The order read takes the assigned scooter rider's position for the
     // customer's tracking screen; presentOrder lets it out only to the customer,
     // between pickup and handover (tested under presentOrder).
     for (const [name, select] of Object.entries(SELECTS)) {
-      if (name === "driverAdminSelect" || name === "orderSelect") continue;
+      if (name === "driverAdminSelect" || name === "orderSelect" || name === "rideSelect") continue;
       expect(namesIn(select)).not.toContain("currentLat");
     }
     expect(namesIn(driverAdminSelect)).toContain("currentLat");
@@ -189,7 +192,19 @@ describe("presentRide", () => {
     "CANCELLED",
   ];
 
-  it("never carries a forbidden field or the driver's coordinates, for any caller in any state", () => {
+  it("shows the driver's position to the ride's customer during the trip, and to nobody else at any time", () => {
+    const at = String(DRIVER_AT.lat);
+    for (const status of ["ACCEPTED", "DRIVER_ARRIVED", "IN_PROGRESS"] as const) {
+      expect(presentRide(ride(status), "CUSTOMER")).toMatchObject({ driver: { location: DRIVER_AT } });
+      expect(namesIn(presentRide(ride(status), "DRIVER"))).not.toContain(at);
+      expect(namesIn(presentRide(ride(status), "ADMIN"))).not.toContain(at);
+    }
+    for (const status of ["COMPLETED", "CANCELLED"] as const) {
+      expect(namesIn(presentRide(ride(status), "CUSTOMER"))).not.toContain(at);
+    }
+  });
+
+  it("never carries a forbidden field or the raw coordinate columns, for any caller in any state", () => {
     for (const relation of relations) {
       for (const status of statuses) {
         const text = namesIn(presentRide(ride(status), relation));
