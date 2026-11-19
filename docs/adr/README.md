@@ -17,6 +17,7 @@ decision gets a new record at the time it is made.
 | [0005](0005-public-event-pages-in-the-api-app.md) | The API app serves the public event pages; no `apps/web` yet | Accepted | 19 Nov 2026 |
 | [0006](0006-posters-in-postgres.md) | Posters live in Postgres, stripped of metadata, until there is a bucket | Accepted | 18 Nov 2026 |
 | [0007](0007-gcp-only.md) | GCP is the only cloud; Meta is the only outside service | Accepted | 4 Nov 2026 |
+| [0008](0008-poster-reader.md) | A language model proposes an event's details; an admin applies them, and it never publishes | Accepted | 19 Nov 2026 |
 
 ## Template
 

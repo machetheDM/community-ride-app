@@ -170,7 +170,7 @@ Terraform: `terraform -chdir=infra/gcp fmt -check; terraform -chdir=infra/gcp va
   evaluation in CI (4.6), the model card and NIST AI 600-1 table (4.8, in part). Not measured:
   the model's accuracy and cost (needs a GCP project) and the manual baseline (4.2, needs a
   person). Left: the Facebook post draft (4.7), the AICM and SP 800-218A tables.
-- Decisions are in `docs/adr/` (0001 to 0008). Threat model: 68 rows DONE, 6 OPEN, 9 PLANNED.
+- Decisions are in `docs/adr/` (0001 to 0008). Threat model: 73 rows DONE, 8 OPEN, 2 PLANNED.
 - Tests: unit (`npx turbo test`) and integration against Postgres
   (`npm run test:integration -w @ride/api`, needs `TEST_DATABASE_URL` on localhost).
 - Nothing deployed. No GCP project. No real users or data.

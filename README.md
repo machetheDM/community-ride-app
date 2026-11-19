@@ -49,7 +49,8 @@ community-ride-app/
 │   ├── types/            ← Shared domain types
 │   ├── maps-service/     ← Google Maps Platform integration (3 subpath exports)
 │   ├── push-service/     ← Push notifications: Expo + FCM dual transport
-│   └── analytics/        ← BigQuery event streaming + dashboard queries
+│   ├── analytics/        ← BigQuery event streaming + dashboard queries
+│   └── poster-reader/    ← Gemini on Vertex AI reads event posters (CONFIGURED, off)
 ├── infra/gcp/            ← Terraform: budget, Cloud Run, BigQuery, IAM, WIF
 ├── scripts/              ← ETA model training
 ├── docs/                 ← Architecture and cost documentation
@@ -193,6 +194,28 @@ is no sample data on the page: with one seeded trip it renders near-empty, which
 Every query is date-bounded, selects named columns, and caps `maximumBytesBilled` — BigQuery's free
 tier is 1 TiB of query processing per month and `SELECT *` on a growing events table is how that
 gets spent.
+
+### The poster reader: the one language-model feature
+
+**CONFIGURED, not WIRED.** No GCP project exists, so it has never answered a real request, and it
+is off unless its settings are present (`.env.example`).
+- **What it does:** on a draft event's page, Gemini on Vertex AI reads the poster and proposes six
+  details. An admin ticks the ones that match the poster and applies them to the draft.
+  Publishing stays a separate button ([ADR 0008](docs/adr/0008-poster-reader.md)).
+- **Its defences against a poster that carries instructions:**
+  - a fixed schema, with no field that could publish, price or act;
+  - any answer with an extra key is discarded whole;
+  - a checker sets aside any field that reads like an instruction or carries a link, an email
+    address, markup or the prompt's canary;
+  - the admin applies proposals field by field.
+- **Evaluation in CI:** `npm run eval -w @ride/poster-reader`, with no model call. It uses
+  21 synthetic posters and 19 hand-written compromised answers mapped to the OWASP LLM Top 10.
+  A missed defence fails the build. Model accuracy is reported only from answers recorded on a
+  live run, and none exists yet.
+- **Record of each call:** latency, tokens, cost and prompt version, in `ModelCall`.
+  `npm run model-cost -w @ride/db` totals a day.
+- **More:** [model card](packages/poster-reader/MODEL_CARD.md) and
+  [risks](docs/ai/poster-reader-risks.md).
 
 ### Fares are calculated server-side
 
