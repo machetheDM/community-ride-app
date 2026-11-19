@@ -91,7 +91,7 @@ export default function EventsScreen() {
             {error && <Text style={styles.error}>{error}</Text>}
           </View>
         }
-        ListEmptyComponent={!error ? <Text style={styles.muted}>No events are listed yet.</Text> : null}
+        ListEmptyComponent={!error ? <Text style={styles.muted}>No events are listed yet.</Text> : undefined}
         renderItem={({ item }) => (
           <TouchableOpacity
             style={styles.eventCard}

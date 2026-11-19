@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from "react";
 import {
   View, Text, StyleSheet, SectionList, TouchableOpacity,
-  SafeAreaView, ActivityIndicator, RefreshControl,
+  ActivityIndicator, RefreshControl,
   Modal, KeyboardAvoidingView, Platform, ScrollView, Alert,
 } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { AddressAutocomplete } from "@ride/maps-service/native";
@@ -268,7 +269,7 @@ export default function StoreDetailScreen() {
       )}
 
       {/* ── Checkout Modal ── */}
-      <Modal visible={checkoutOpen} animationType="slide" transparent onRequestClose={() => !placing && setCheckoutOpen(false)}>
+      <Modal visible={checkoutOpen} animationType="slide" transparent onRequestClose={() => { if (!placing) setCheckoutOpen(false); }}>
         <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : undefined} style={styles.modalOverlay}>
           <View style={styles.modalSheet}>
             {orderSuccess ? (

@@ -1,8 +1,10 @@
 import React, { useState, useRef } from "react";
 import {
   View, Text, TextInput, TouchableOpacity, StyleSheet,
-  SafeAreaView, KeyboardAvoidingView, Platform, ActivityIndicator, Alert,
+  KeyboardAvoidingView, Platform, ActivityIndicator, Alert,
 } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
+import type { TextInputInstance } from "react-native";
 import { useRouter } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { API_URL } from "@/constants/api";
@@ -11,7 +13,7 @@ export default function LoginScreen() {
   const router = useRouter();
   const [phone, setPhone] = useState("");
   const [loading, setLoading] = useState(false);
-  const inputRef = useRef<TextInput>(null);
+  const inputRef = useRef<TextInputInstance>(null);
 
   const handleSubmit = async () => {
     const digits = phone.replace(/\D/g, "");
