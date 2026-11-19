@@ -1,7 +1,47 @@
 import type { NextConfig } from "next";
 import path from "node:path";
 
+const isDev = process.env.NODE_ENV !== "production";
+
+/**
+ * Headers for the public pages (`/e/{slug}`, the event pages a Facebook post links
+ * to). `src/proxy.ts` covers `/api` only, so without this the one part of the API
+ * app a stranger opens in a browser would carry no headers at all.
+ *
+ * The CSP follows the portal's (apps/merchant-portal/next.config.ts): the App
+ * Router's inline RSC scripts need `'unsafe-inline'` until a per-request nonce is
+ * set (threat model, open item). The page renders no user-supplied markup: titles
+ * and descriptions are React text, so they are escaped. `img-src 'self'` because
+ * the poster is served from this origin; `form-action 'none'` because booking
+ * happens in the app, not on the page.
+ */
+const publicPageCsp = [
+  "default-src 'self'",
+  `script-src 'self' 'unsafe-inline'${isDev ? " 'unsafe-eval'" : ""}`,
+  "style-src 'self' 'unsafe-inline'",
+  "img-src 'self' data:",
+  "font-src 'self'",
+  "connect-src 'self'",
+  "object-src 'none'",
+  "base-uri 'none'",
+  "form-action 'none'",
+  "frame-ancestors 'none'",
+].join("; ");
+
+const publicPageHeaders = [
+  { key: "Content-Security-Policy", value: publicPageCsp },
+  { key: "X-Content-Type-Options", value: "nosniff" },
+  { key: "X-Frame-Options", value: "DENY" },
+  { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
+  { key: "Permissions-Policy", value: "camera=(), microphone=(), geolocation=()" },
+  { key: "Strict-Transport-Security", value: "max-age=31536000; includeSubDomains" },
+];
+
 const nextConfig: NextConfig = {
+  poweredByHeader: false,
+  async headers() {
+    return [{ source: "/e/:path*", headers: publicPageHeaders }];
+  },
   allowedDevOrigins: ["127.0.0.1"],
   images: {
     remotePatterns: [

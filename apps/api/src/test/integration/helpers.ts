@@ -298,3 +298,98 @@ export async function eventually(check: () => boolean, timeoutMs = 3000): Promis
 export async function auditRows(entityId: string) {
   return prisma.auditLog.findMany({ where: { entityId }, orderBy: { createdAt: "asc" } });
 }
+
+// ─── Events and group trips ───────────────────────────────────
+
+/** A venue at the test coordinates, with an agreement on file. */
+export async function createVenue() {
+  return prisma.venue.create({
+    data: {
+      name: `Test Venue ${tag()}`,
+      slug: `test-venue-${tag()}`,
+      kind: "HALL",
+      address: "1 Test Hall Road, Testville, Fakecity",
+      lat: -26.2,
+      lng: 28.04,
+      contactName: "Test Contact",
+      contactPhone: fakePhone(),
+      agreementAt: new Date(),
+    },
+  });
+}
+
+/** A published event starting in `daysAhead` days, with a stand-in poster. */
+export async function createEvent(
+  options: { status?: "DRAFT" | "PUBLISHED" | "CANCELLED"; daysAhead?: number; poster?: boolean } = {}
+) {
+  const venue = await createVenue();
+  const admin = await createUser("ADMIN");
+  const poster = options.poster ?? true;
+  const startsAt = new Date(Date.now() + (options.daysAhead ?? 7) * 86_400_000);
+  return prisma.event.create({
+    data: {
+      venueId: venue.id,
+      title: `Test Event ${tag()}`,
+      slug: `test-event-${tag()}`,
+      description: "A test event.",
+      startsAt,
+      endsAt: new Date(startsAt.getTime() + 5 * 3_600_000),
+      status: options.status ?? "PUBLISHED",
+      publishedAt: options.status === "DRAFT" ? null : new Date(),
+      createdById: admin.userId,
+      ...(poster
+        ? { posterBytes: Buffer.from([0x89, 0x50, 0x4e, 0x47]), posterType: "image/png", posterSha256: `test-sha-${tag()}` }
+        : {}),
+    },
+    include: { venue: true },
+  });
+}
+
+/** A pickup point about 11 km from the test venue (floor R20 a seat). */
+export async function createPickupPoint(options: { lat?: number; lng?: number; active?: boolean } = {}) {
+  return prisma.pickupPoint.create({
+    data: {
+      name: `Test Taxi Rank ${tag()}`,
+      address: "Test Rank, Fakecity",
+      lat: options.lat ?? -26.3,
+      lng: options.lng ?? 28.04,
+      isActive: options.active ?? true,
+    },
+  });
+}
+
+export const OPERATOR_DOCUMENT_KINDS = ["DRIVING_PERMIT", "OPERATING_LICENCE", "VEHICLE_LICENCE", "INSURANCE"] as const;
+
+/**
+ * A group-trip operator: an approved driver with an approved minibus (15 seats)
+ * and, by default, every document verified by an admin.
+ */
+export async function createOperator(options: { verified?: boolean; seats?: number } = {}): Promise<TestDriver> {
+  const driver = await createDriver({ vehicleApproved: null });
+  await prisma.vehicle.create({
+    data: {
+      driverId: driver.driverId,
+      type: "MINIBUS",
+      make: "Testmake",
+      model: "Testbus",
+      year: 2019,
+      color: "White",
+      licensePlate: `TEST ${tag()} GP`,
+      seats: options.seats ?? 15,
+      isApproved: true,
+    },
+  });
+  if (options.verified ?? true) {
+    await prisma.operatorDocument.createMany({
+      data: OPERATOR_DOCUMENT_KINDS.map((kind) => ({
+        userId: driver.userId,
+        kind,
+        referenceEnc: encryptField(`TEST-${kind}`),
+        referenceLast4: "TEST",
+        status: "VERIFIED" as const,
+        verifiedAt: new Date(),
+      })),
+    });
+  }
+  return driver;
+}
