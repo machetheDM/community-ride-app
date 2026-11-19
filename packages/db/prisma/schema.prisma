@@ -21,15 +21,19 @@ enum UserRole {
 
   @@schema("ride")
 }
+
 enum VehicleType {
   SEDAN
   MINIVAN
   BAKKIE
   SCOOTER
   BICYCLE
+  /// A 15-seat minibus taxi: the vehicle most event group trips need (Phase 3).
+  MINIBUS
 
   @@schema("ride")
 }
+
 enum RideStatus {
   REQUESTED
   ACCEPTED
@@ -40,6 +44,7 @@ enum RideStatus {
 
   @@schema("ride")
 }
+
 enum OrderStatus {
   PENDING
   CONFIRMED
@@ -51,6 +56,7 @@ enum OrderStatus {
 
   @@schema("ride")
 }
+
 enum DeliveryStatus {
   PENDING
   ASSIGNED
@@ -61,6 +67,7 @@ enum DeliveryStatus {
 
   @@schema("ride")
 }
+
 enum PaymentMethod {
   CASH
   CARD
@@ -70,6 +77,7 @@ enum PaymentMethod {
 
   @@schema("ride")
 }
+
 enum PaymentStatus {
   PENDING
   COMPLETED
@@ -78,20 +86,21 @@ enum PaymentStatus {
 
   @@schema("ride")
 }
+
 // ─────────────────────────────────────────────
 // Users & Profiles
 // ─────────────────────────────────────────────
 
 model User {
-  id            String    @id @default(cuid())
-  phone         String    @unique
-  email         String?   @unique
+  id            String   @id @default(cuid())
+  phone         String   @unique
+  email         String?  @unique
   name          String
   avatar        String?
-  role          UserRole  @default(CUSTOMER)
-  isVerified    Boolean   @default(false)
-  isActive      Boolean   @default(true)
-  walletBalance Decimal   @default(0) @db.Decimal(10, 2)
+  role          UserRole @default(CUSTOMER)
+  isVerified    Boolean  @default(false)
+  isActive      Boolean  @default(true)
+  walletBalance Decimal  @default(0) @db.Decimal(10, 2)
 
   // Named `fcmToken` until it was noticed that it never held an FCM token — the
   // apps register through Expo's push service and store an `ExponentPushToken[…]`.
@@ -99,36 +108,40 @@ model User {
   // than the value. Renamed in the schema; `@map` keeps the existing column so
   // `prisma db push` does not drop it. `pushProvider` records which transport the
   // stored token belongs to.
-  pushToken     String?   @map("fcmToken")
-  pushProvider  String    @default("expo") // expo | fcm
+  pushToken    String? @map("fcmToken")
+  pushProvider String  @default("expo") // expo | fcm
 
   // Copied into every token at sign-in and compared on every request. Bumping it
   // signs the user out everywhere at once: after a role change, a suspension, or
   // a stolen phone. Without it a 30-day token outlives every decision made about
   // the account it belongs to.
-  tokenVersion  Int       @default(0)
+  tokenVersion Int @default(0)
 
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   driverProfile   Driver?
   riderProfile    Rider?
   merchantProfile Merchant?
 
-  rides         Ride[]         @relation("CustomerRides")
-  orders        Order[]        @relation("CustomerOrders")
-  ratingsGiven  Rating[]       @relation("RaterRatings")
-  ratingsReceived Rating[]     @relation("RateeRatings")
-  notifications Notification[]
-  payments      Payment[]
+  rides             Ride[]             @relation("CustomerRides")
+  orders            Order[]            @relation("CustomerOrders")
+  ratingsGiven      Rating[]           @relation("RaterRatings")
+  ratingsReceived   Rating[]           @relation("RateeRatings")
+  notifications     Notification[]
+  payments          Payment[]
+  tripRequests      TripRequest[]
+  operatorDocuments OperatorDocument[]
+  ledgerEntries     LedgerEntry[]
 
   @@schema("ride")
 }
+
 model Driver {
-  id            String   @id @default(cuid())
-  userId        String   @unique
-  user          User     @relation(fields: [userId], references: [id])
-  licenseNumber String   @unique
+  id            String @id @default(cuid())
+  userId        String @unique
+  user          User   @relation(fields: [userId], references: [id])
+  licenseNumber String @unique
 
   // A South African ID number is never stored as itself. `idNumberEnc` holds it
   // encrypted (AES-256-GCM, see packages/db/src/crypto.ts), `idNumberHash` is a
@@ -136,25 +149,28 @@ model Driver {
   // `idNumberLast4` is the only part any screen shows. Nullable because the
   // number is captured at operator onboarding, not at sign-up.
   idNumberEnc   String?
-  idNumberHash  String?  @unique
+  idNumberHash  String? @unique
   idNumberLast4 String?
 
-  isOnline      Boolean  @default(false)
-  isApproved    Boolean  @default(false)
-  currentLat    Float?
-  currentLng    Float?
-  heading       Float?
-  rating        Float    @default(0)
-  totalRides    Int      @default(0)
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
+  isOnline   Boolean  @default(false)
+  isApproved Boolean  @default(false)
+  currentLat Float?
+  currentLng Float?
+  heading    Float?
+  rating     Float    @default(0)
+  totalRides Int      @default(0)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
 
-  vehicle  Vehicle?
-  rides    Ride[]
-  earnings DriverEarning[]
+  vehicle      Vehicle?
+  rides        Ride[]
+  earnings     DriverEarning[]
+  groupTrips   GroupTrip[]     @relation("GroupTripDriver")
+  counterTrips GroupTrip[]     @relation("GroupTripCounter")
 
   @@schema("ride")
 }
+
 model Rider {
   id              String   @id @default(cuid())
   userId          String   @unique
@@ -178,6 +194,7 @@ model Rider {
 
   @@schema("ride")
 }
+
 model Vehicle {
   id           String      @id @default(cuid())
   driverId     String?     @unique
@@ -190,45 +207,49 @@ model Vehicle {
   year         Int
   color        String
   licensePlate String      @unique
+  /// Passenger seats, set when the vehicle is approved. Null means the type's
+  /// usual count (packages/db/src/trips.ts).
+  seats        Int?
   isApproved   Boolean     @default(false)
   createdAt    DateTime    @default(now())
   updatedAt    DateTime    @updatedAt
 
   @@schema("ride")
 }
+
 // ─────────────────────────────────────────────
 // Ride-Hailing
 // ─────────────────────────────────────────────
 
 model Ride {
-  id             String     @id @default(cuid())
-  customerId     String
-  customer       User       @relation("CustomerRides", fields: [customerId], references: [id])
-  driverId       String?
-  driver         Driver?    @relation(fields: [driverId], references: [id])
-  pickupLat      Float
-  pickupLng      Float
-  pickupAddress  String
-  dropoffLat     Float
-  dropoffLng     Float
-  dropoffAddress String
-  status         RideStatus @default(REQUESTED)
-  vehicleType    String     @default("SEDAN")
-  fareEstimate   Decimal    @db.Decimal(10, 2)
-  fareActual     Decimal?   @db.Decimal(10, 2)
-  distanceKm     Float      @default(0)
+  id              String        @id @default(cuid())
+  customerId      String
+  customer        User          @relation("CustomerRides", fields: [customerId], references: [id])
+  driverId        String?
+  driver          Driver?       @relation(fields: [driverId], references: [id])
+  pickupLat       Float
+  pickupLng       Float
+  pickupAddress   String
+  dropoffLat      Float
+  dropoffLng      Float
+  dropoffAddress  String
+  status          RideStatus    @default(REQUESTED)
+  vehicleType     String        @default("SEDAN")
+  fareEstimate    Decimal       @db.Decimal(10, 2)
+  fareActual      Decimal?      @db.Decimal(10, 2)
+  distanceKm      Float         @default(0)
   durationMinutes Int?
-  paymentMethod  PaymentMethod @default(CASH)
-  scheduledAt    DateTime?
-  acceptedAt     DateTime?
-  arrivedAt      DateTime?
-  startedAt      DateTime?
-  completedAt    DateTime?
-  cancelledAt    DateTime?
-  cancelReason   String?
-  cancelledBy    String?    // CUSTOMER | DRIVER | ADMIN
-  createdAt      DateTime   @default(now())
-  updatedAt      DateTime   @updatedAt
+  paymentMethod   PaymentMethod @default(CASH)
+  scheduledAt     DateTime?
+  acceptedAt      DateTime?
+  arrivedAt       DateTime?
+  startedAt       DateTime?
+  completedAt     DateTime?
+  cancelledAt     DateTime?
+  cancelReason    String?
+  cancelledBy     String? // CUSTOMER | DRIVER | ADMIN
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
 
   locations RideLocation[]
   payment   Payment?
@@ -237,6 +258,7 @@ model Ride {
 
   @@schema("ride")
 }
+
 model RideLocation {
   id        String   @id @default(cuid())
   rideId    String
@@ -248,6 +270,7 @@ model RideLocation {
 
   @@schema("ride")
 }
+
 // ─────────────────────────────────────────────
 // Marketplace & Delivery
 // ─────────────────────────────────────────────
@@ -264,6 +287,7 @@ model Merchant {
 
   @@schema("ride")
 }
+
 /// A shopping complex or mall: the unit the platform is sold to (docs/PLAN.md §1,
 /// Phase 2.2). Its stores share one delivery zone and one delivery fee, so a
 /// customer pays the same to have a loaf of bread or a phone charger brought from
@@ -289,6 +313,7 @@ model Complex {
 
   @@schema("ride")
 }
+
 model Store {
   id           String   @id @default(cuid())
   merchantId   String
@@ -321,6 +346,7 @@ model Store {
   @@index([complexId])
   @@schema("ride")
 }
+
 model StoreCategory {
   id        String   @id @default(cuid())
   storeId   String
@@ -333,6 +359,7 @@ model StoreCategory {
 
   @@schema("ride")
 }
+
 model Product {
   id          String         @id @default(cuid())
   storeId     String
@@ -352,6 +379,7 @@ model Product {
 
   @@schema("ride")
 }
+
 model Order {
   id              String        @id @default(cuid())
   customerId      String
@@ -373,7 +401,7 @@ model Order {
   deliveredAt     DateTime?
   cancelledAt     DateTime?
   cancelReason    String?
-  cancelledBy     String?       // CUSTOMER | MERCHANT | ADMIN
+  cancelledBy     String? // CUSTOMER | MERCHANT | ADMIN
   createdAt       DateTime      @default(now())
   updatedAt       DateTime      @updatedAt
 
@@ -385,6 +413,7 @@ model Order {
 
   @@schema("ride")
 }
+
 model OrderItem {
   id         String   @id @default(cuid())
   orderId    String
@@ -399,6 +428,7 @@ model OrderItem {
 
   @@schema("ride")
 }
+
 model Delivery {
   id               String         @id @default(cuid())
   orderId          String         @unique
@@ -433,6 +463,7 @@ model Delivery {
   @@index([status, riderId])
   @@schema("ride")
 }
+
 model DeliveryLocation {
   id         String   @id @default(cuid())
   deliveryId String
@@ -443,6 +474,7 @@ model DeliveryLocation {
 
   @@schema("ride")
 }
+
 // ─────────────────────────────────────────────
 // Payments & Earnings
 // ─────────────────────────────────────────────
@@ -465,6 +497,7 @@ model Payment {
 
   @@schema("ride")
 }
+
 model DriverEarning {
   id         String   @id @default(cuid())
   driverId   String
@@ -478,6 +511,7 @@ model DriverEarning {
 
   @@schema("ride")
 }
+
 model RiderEarning {
   id         String   @id @default(cuid())
   riderId    String
@@ -491,6 +525,7 @@ model RiderEarning {
 
   @@schema("ride")
 }
+
 // ─────────────────────────────────────────────
 // Ratings & Notifications
 // ─────────────────────────────────────────────
@@ -511,6 +546,7 @@ model Rating {
 
   @@schema("ride")
 }
+
 model Notification {
   id        String   @id @default(cuid())
   userId    String
@@ -524,6 +560,7 @@ model Notification {
 
   @@schema("ride")
 }
+
 // ─────────────────────────────────────────────
 // Config & Admin
 // ─────────────────────────────────────────────
@@ -542,6 +579,7 @@ model PricingConfig {
 
   @@schema("ride")
 }
+
 model DeliveryZone {
   id          String   @id @default(cuid())
   name        String
@@ -553,6 +591,7 @@ model DeliveryZone {
 
   @@schema("ride")
 }
+
 model OtpCode {
   id        String   @id @default(cuid())
   phone     String
@@ -568,7 +607,6 @@ model OtpCode {
   createdAt DateTime @default(now())
 
   @@index([phone, createdAt])
-
   @@schema("ride")
 }
 
@@ -579,8 +617,8 @@ model AuditLog {
   createdAt   DateTime @default(now())
   actorUserId String?
   actorRole   String?
-  action      String   // e.g. ride.accept, order.status, auth.otp.verify.fail
-  entityType  String   // e.g. Ride, Order, User
+  action      String // e.g. ride.accept, order.status, auth.otp.verify.fail
+  entityType  String // e.g. Ride, Order, User
   entityId    String?
   ip          String?
   detail      Json?
@@ -588,6 +626,302 @@ model AuditLog {
   @@index([entityType, entityId])
   @@index([actorUserId, createdAt])
   @@index([action, createdAt])
+  @@schema("ride")
+}
 
+// ─────────────────────────────────────────────
+// Events and group trips (docs/PLAN.md Phase 3)
+// ─────────────────────────────────────────────
+
+enum VenueKind {
+  RESORT
+  CLUB
+  HALL
+  SPORTS
+  OTHER
+
+  @@schema("ride")
+}
+
+/// A partner venue: a resort, club or hall that sends us its events' posters.
+/// The agreement is recorded as a date and a note: what was agreed, with whom.
+model Venue {
+  id            String    @id @default(cuid())
+  name          String
+  slug          String    @unique
+  kind          VenueKind @default(OTHER)
+  address       String
+  lat           Float
+  lng           Float
+  /// The venue's business contact. Admin only; never on a public page.
+  contactName   String?
+  contactPhone  String?
+  agreementAt   DateTime?
+  agreementNote String?
+  isActive      Boolean   @default(true)
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  events Event[]
+
+  @@schema("ride")
+}
+
+enum EventStatus {
+  DRAFT
+  PUBLISHED
+  CANCELLED
+
+  @@schema("ride")
+}
+
+/// An event at a venue. A draft is seen by admins only; publishing puts it on the
+/// public page that is shared to Facebook.
+model Event {
+  id           String      @id @default(cuid())
+  venueId      String
+  venue        Venue       @relation(fields: [venueId], references: [id])
+  title        String
+  slug         String      @unique
+  description  String?
+  startsAt     DateTime
+  endsAt       DateTime?
+  ticketInfo   String?
+  status       EventStatus @default(DRAFT)
+  /// The poster, re-written without its metadata (camera, location, author) and
+  /// capped at 2 MB. In the database, not a bucket: a few posters a month do not
+  /// justify a storage service before there is a cloud account to hold one.
+  posterBytes  Bytes?
+  posterType   String?
+  posterSha256 String?
+  publishedAt  DateTime?
+  createdById  String
+  createdAt    DateTime    @default(now())
+  updatedAt    DateTime    @updatedAt
+
+  spends       EventSpend[]
+  visits       EventVisit[]
+  tripRequests TripRequest[]
+  groupTrips   GroupTrip[]
+
+  @@index([status, startsAt])
+  @@schema("ride")
+}
+
+/// Money spent promoting an event (a Meta boost), so the funnel can say whether
+/// the fees an event earned covered what it cost (PLAN.md §4, step 10).
+model EventSpend {
+  id           String   @id @default(cuid())
+  eventId      String
+  event        Event    @relation(fields: [eventId], references: [id])
+  channel      String // META | OTHER
+  amount       Decimal  @db.Decimal(10, 2)
+  spentOn      DateTime
+  note         String?
+  recordedById String
+  createdAt    DateTime @default(now())
+
+  @@index([eventId])
+  @@schema("ride")
+}
+
+/// One view of a public event page, by channel (fb, wa, sms, direct). No IP, no
+/// user, no cookie: counting is all the funnel needs.
+model EventVisit {
+  id        String   @id @default(cuid())
+  eventId   String
+  event     Event    @relation(fields: [eventId], references: [id])
+  channel   String
+  createdAt DateTime @default(now())
+
+  @@index([eventId, channel])
+  @@schema("ride")
+}
+
+/// A published pickup point: a taxi rank, plaza or garage. Group trips leave from
+/// public places, never a passenger's home (threat model PL-4).
+model PickupPoint {
+  id        String   @id @default(cuid())
+  name      String
+  address   String
+  lat       Float
+  lng       Float
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+
+  requests   TripRequest[]
+  groupTrips GroupTrip[]
+
+  @@schema("ride")
+}
+
+enum TripDirection {
+  TO_EVENT
+  FROM_EVENT
+
+  @@schema("ride")
+}
+
+enum TripRequestStatus {
+  /// Asked for seats; waiting for an operator.
+  WAITING
+  /// An operator countered; this passenger has not answered yet.
+  CONFIRMING
+  /// An operator has the trip at a price this passenger agreed to.
+  BOOKED
+  BOARDED
+  NO_SHOW
+  COMPLETED
+  /// The passenger turned down a counter.
+  DECLINED
+  CANCELLED
+
+  @@schema("ride")
+}
+
+/// One passenger's request for seats to (or from) an event, at the price per seat
+/// they offered. Pooled with others leaving the same point into a group trip.
+model TripRequest {
+  id             String            @id @default(cuid())
+  eventId        String
+  event          Event             @relation(fields: [eventId], references: [id])
+  customerId     String
+  customer       User              @relation(fields: [customerId], references: [id])
+  pickupPointId  String
+  pickupPoint    PickupPoint       @relation(fields: [pickupPointId], references: [id])
+  direction      TripDirection     @default(TO_EVENT)
+  seats          Int
+  pricePerSeat   Decimal           @db.Decimal(10, 2)
+  status         TripRequestStatus @default(WAITING)
+  groupTripId    String?
+  groupTrip      GroupTrip?        @relation(fields: [groupTripId], references: [id])
+  /// Where the passenger came from (fb, wa, direct), for the funnel.
+  channel        String?
+  /// The passenger's boarding code, encrypted; the operator enters it at pickup.
+  checkInCodeEnc String?
+  createdAt      DateTime          @default(now())
+  updatedAt      DateTime          @updatedAt
+
+  /// One request per passenger per event and direction: more seats means
+  /// changing the request, not stacking requests to crowd a trip.
+  @@unique([eventId, customerId, direction])
+  @@index([groupTripId])
+  @@schema("ride")
+}
+
+enum GroupTripStatus {
+  OPEN
+  COUNTERED
+  BOOKED
+  COMPLETED
+  CANCELLED
+
+  @@schema("ride")
+}
+
+/// Passengers going to one event from one pickup point at one time, offered to
+/// operators as one job (PLAN.md §4, lane 1b).
+model GroupTrip {
+  id                  String          @id @default(cuid())
+  eventId             String
+  event               Event           @relation(fields: [eventId], references: [id])
+  pickupPointId       String
+  pickupPoint         PickupPoint     @relation(fields: [pickupPointId], references: [id])
+  direction           TripDirection   @default(TO_EVENT)
+  departAt            DateTime
+  status              GroupTripStatus @default(OPEN)
+  driverId            String?
+  driver              Driver?         @relation("GroupTripDriver", fields: [driverId], references: [id])
+  /// One counter per trip: the operator who made it holds the trip until the
+  /// passengers answer or the counter expires.
+  counterDriverId     String?
+  counterDriver       Driver?         @relation("GroupTripCounter", fields: [counterDriverId], references: [id])
+  counterPricePerSeat Decimal?        @db.Decimal(10, 2)
+  counteredAt         DateTime?
+  counterExpiresAt    DateTime?
+  bookedAt            DateTime?
+  completedAt         DateTime?
+  cancelledAt         DateTime?
+  /// Keyed hash of the passengers' share link token; the token itself is never stored.
+  shareTokenHash      String?         @unique
+  /// The fee rate when the trip was booked, so a later change does not reprice it.
+  platformFeePercent  Float?
+  createdAt           DateTime        @default(now())
+  updatedAt           DateTime        @updatedAt
+
+  requests TripRequest[]
+
+  @@index([eventId, status])
+  @@schema("ride")
+}
+
+enum OperatorDocumentKind {
+  DRIVING_PERMIT
+  OPERATING_LICENCE
+  VEHICLE_LICENCE
+  INSURANCE
+
+  @@schema("ride")
+}
+
+enum DocumentStatus {
+  PENDING
+  VERIFIED
+  REJECTED
+
+  @@schema("ride")
+}
+
+/// A document an operator must hold to take group trips (PLAN.md 3.7). Recorded
+/// and checked by an admin against the paper; nothing approves itself.
+model OperatorDocument {
+  id             String               @id @default(cuid())
+  userId         String
+  user           User                 @relation(fields: [userId], references: [id])
+  kind           OperatorDocumentKind
+  /// The document's number, encrypted; only its last four characters are shown.
+  referenceEnc   String
+  referenceLast4 String
+  expiresOn      DateTime?
+  status         DocumentStatus       @default(PENDING)
+  note           String?
+  verifiedById   String?
+  verifiedAt     DateTime?
+  createdAt      DateTime             @default(now())
+  updatedAt      DateTime             @updatedAt
+
+  @@unique([userId, kind])
+  @@schema("ride")
+}
+
+enum LedgerKind {
+  /// Our share of a completed trip or delivery, owed by the operator.
+  FEE_DUE
+  /// A payment from the operator towards what they owe.
+  FEE_PAID
+  /// A correction by an admin, signed: positive adds to what is owed.
+  ADJUSTMENT
+
+  @@schema("ride")
+}
+
+/// What operators owe us, as events (AGENTS.md rule 3). A balance is always the
+/// sum of these rows, never a stored number. Rows are only ever inserted.
+model LedgerEntry {
+  id             String     @id @default(cuid())
+  operatorUserId String
+  operator       User       @relation(fields: [operatorUserId], references: [id])
+  kind           LedgerKind
+  amount         Decimal    @db.Decimal(10, 2)
+  /// RIDE | DELIVERY | GROUP_TRIP | PAYMENT | MANUAL
+  sourceType     String
+  sourceId       String?
+  note           String?
+  recordedById   String?
+  createdAt      DateTime   @default(now())
+
+  /// A trip's fee is recorded once, however many times completion is retried.
+  @@unique([kind, sourceType, sourceId])
+  @@index([operatorUserId, createdAt])
   @@schema("ride")
 }

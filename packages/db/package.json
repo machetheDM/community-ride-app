@@ -16,7 +16,8 @@
     "./lifecycle": "./src/lifecycle.ts",
     "./otp": "./src/otp.ts",
     "./session": "./src/session.ts",
-    "./dispatch": "./src/dispatch.ts"
+    "./dispatch": "./src/dispatch.ts",
+    "./trips": "./src/trips.ts"
   },
   "dependencies": {
     "@prisma/adapter-pg": "^7.10.1",
