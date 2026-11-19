@@ -15,7 +15,7 @@
   },
   "peerDependencies": {
     "react": "*",
-    "react-native": "^0.85.3",
+    "react-native": "^0.86.3",
     "react-native-maps": "^1.27.2"
   },
   "peerDependenciesMeta": {
