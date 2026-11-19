@@ -23,7 +23,7 @@ export default function TabLayout() {
         options={{
           title: "Dashboard",
           tabBarIcon: ({ color, size }) => (
-            <Ionicons name="home" size={size} color={color} />
+            <Ionicons name="home" size={size} color={color as string} />
           ),
         }}
       />
@@ -32,7 +32,7 @@ export default function TabLayout() {
         options={{
           title: "Earnings",
           tabBarIcon: ({ color, size }) => (
-            <Ionicons name="cash" size={size} color={color} />
+            <Ionicons name="cash" size={size} color={color as string} />
           ),
         }}
       />
@@ -41,7 +41,7 @@ export default function TabLayout() {
         options={{
           title: "History",
           tabBarIcon: ({ color, size }) => (
-            <Ionicons name="time" size={size} color={color} />
+            <Ionicons name="time" size={size} color={color as string} />
           ),
         }}
       />
@@ -50,7 +50,7 @@ export default function TabLayout() {
         options={{
           title: "Profile",
           tabBarIcon: ({ color, size }) => (
-            <Ionicons name="person" size={size} color={color} />
+            <Ionicons name="person" size={size} color={color as string} />
           ),
         }}
       />

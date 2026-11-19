@@ -260,7 +260,7 @@ export default function StoreDetailScreen() {
       )}
 
       {/* ── Checkout Modal ── */}
-      <Modal visible={checkoutOpen} animationType="slide" transparent onRequestClose={() => !placing && setCheckoutOpen(false)}>
+      <Modal visible={checkoutOpen} animationType="slide" transparent onRequestClose={() => { if (!placing) setCheckoutOpen(false); }}>
         <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : undefined} style={styles.modalOverlay}>
           <View style={styles.modalSheet}>
             {orderSuccess ? (

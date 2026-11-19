@@ -11,7 +11,7 @@ export default function HistoryScreen() {
       <FlatList
         data={[]}
         keyExtractor={(item) => String(item)}
-        renderItem={null}
+        renderItem={() => null}
         ListEmptyComponent={
           <View style={styles.empty}>
             <Ionicons name="time-outline" size={56} color="#334155" />
