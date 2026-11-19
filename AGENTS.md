@@ -74,8 +74,8 @@ real personal data.
 | API | `apps/api` | 3000 | Next.js 16 route handlers. Request hook is `src/proxy.ts` (Next 16 renamed middleware), `/api` only |
 | Public event pages | `apps/api/src/app/e` | 3000 | Server-rendered, headers in `apps/api/next.config.ts` (ADR 0005) |
 | Merchant and admin portal | `apps/merchant-portal` | 3001 | Next.js 16, server actions |
-| Customer app | `apps/customer-app` | — | Expo SDK 52 (upgrade is Phase 2.1) |
-| Operator app | `apps/driver-app` | — | Drivers and scooter riders |
+| Customer app | `apps/customer-app` | — | Expo SDK 58, React Native 0.88, React 19.3.0 (exact) |
+| Operator app | `apps/driver-app` | — | Drivers and scooter riders; same SDK |
 | Database | `packages/db` | — | Prisma 7, Postgres schema `ride`, migrations in `prisma/migrations` |
 | Shared crypto and audit | `packages/db/src/{crypto,audit}.ts` | — | `@ride/db/crypto`, `recordAudit` |
 | Maps | `packages/maps-service` | — | Google Routes and Places (New), server key only |
@@ -147,11 +147,13 @@ Terraform: `terraform -chdir=infra/gcp fmt -check; terraform -chdir=infra/gcp va
 
 ## State (19 November 2026)
 
-- Phases 0 and 1 of `docs/PLAN.md` done. Phase 2 server side and screens done; the Expo SDK
-  upgrade (2.1) is on `chore/expo-sdk-58`, not yet merged.
-- Phase 3 server and admin done: public event pages (`apps/api/src/app/e`), offers, pooling,
-  accept and counter, operator documents, the fee ledger and pause limit, check-in and share
-  links. Left: the mobile screens for events and group trips.
+- Phases 0 and 1 of `docs/PLAN.md` done. Phase 2 done in code: server side, screens, and
+  the Expo SDK 58 upgrade (2.1, merged into `feat/phase-2-delivery`). Neither app has run on
+  a phone yet; the icon and splash artwork were never in the repo.
+- Phase 3 built: public event pages (`apps/api/src/app/e`), offers, pooling, accept and
+  counter, operator documents, the fee ledger and pause limit, check-in, share links
+  (`apps/api/src/app/t`), and the event and group-trip screens in both apps. Left: seeing it
+  on a phone, and a report button (threat model PL-4).
 - Decisions are in `docs/adr/` (0001 to 0007). Threat model: 68 rows DONE, 6 OPEN, 9 PLANNED.
 - Tests: unit (`npx turbo test`) and integration against Postgres
   (`npm run test:integration -w @ride/api`, needs `TEST_DATABASE_URL` on localhost).

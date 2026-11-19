@@ -110,9 +110,10 @@ and refuses to save a model that fails to beat the Google Maps baseline.
   shared store; this is stated rather than implied.
 - **Known advisories, gated** — CI fails on any high or critical advisory unless
   [`security/audit-exceptions.json`](security/audit-exceptions.json) accepts it
-  with a reason and an expiry date (`scripts/audit-gate.mjs`). Six are accepted
-  today, all in Expo SDK 52 and React Native build tooling, until the SDK upgrade;
-  none is present in the API's deployable build (checked 5 November 2026).
+  with a reason and an expiry date (`scripts/audit-gate.mjs`). None is accepted
+  today: the six Expo SDK 52 build-tooling advisories listed there before cleared
+  with the SDK 58 upgrade (19 November 2026). Moderate advisories are reported,
+  not gated.
 
 ### Google Maps Platform
 
@@ -125,8 +126,8 @@ three deliberately separate entry points:
 | `@ride/maps-service/client` | Fetch client for the API proxy | Both Expo apps |
 | `@ride/maps-service/native` | `AddressAutocomplete`, `RouteMap` | Both Expo apps |
 
-The split is load-bearing twice over. The API is on React 19 while Expo pins 18.3.1, so React must
-not appear in the package's main entry. And the server client holds the billable API key, so it
+The split is load-bearing twice over. The Expo apps pin the exact React their SDK ships (19.3.0)
+while the web apps move with Next.js, so React must not appear in the package's main entry. And the server client holds the billable API key, so it
 must be impossible to import it from a mobile bundle by accident.
 
 **Two keys, not one.** The Maps SDK render key ships inside the app binaries — that is unavoidable
@@ -328,7 +329,7 @@ API.
 |---|---|
 | Monorepo | npm workspaces |
 | Web | Next.js 16, App Router, Turbopack, Tailwind CSS v4 |
-| Mobile | Expo SDK, Expo Router v4, React Native |
+| Mobile | Expo SDK 58, Expo Router, React Native 0.88 |
 | Language | TypeScript (strict) |
 | Database | PostgreSQL (Supabase) |
 | ORM | Prisma 7 + `@prisma/adapter-pg` |
