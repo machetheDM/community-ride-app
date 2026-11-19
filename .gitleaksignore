@@ -3,3 +3,7 @@
 # session tokens in a unit test, fixed placeholder strings, not credentials.
 0e1ec0b48a6b3d226248115823bd81793409a7fb:apps/api/src/test/unit/maps-service.test.ts:generic-api-key:256
 0e1ec0b48a6b3d226248115823bd81793409a7fb:apps/api/src/test/unit/maps-service.test.ts:generic-api-key:267
+# Reviewed 19 November 2026: a fixed UUID used as a form's entryKey (the
+# idempotency key a portal form carries so a double submit records once), named
+# KEY in a unit test. Not a credential.
+6cb189572ed0fd12eb7c88b3c2e82dccd2031316:apps/api/src/test/unit/operator-forms.test.ts:generic-api-key:10
