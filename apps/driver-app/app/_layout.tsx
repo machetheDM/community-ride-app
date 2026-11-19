@@ -36,6 +36,15 @@ function AppStack() {
           headerTintColor: "#f8fafc",
         }}
       />
+      <Stack.Screen
+        name="delivery/[id]"
+        options={{
+          headerShown: true,
+          headerTitle: "Delivery",
+          headerStyle: { backgroundColor: "#0f172a" },
+          headerTintColor: "#f8fafc",
+        }}
+      />
     </Stack>
   );
 }

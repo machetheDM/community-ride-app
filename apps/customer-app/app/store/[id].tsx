@@ -2,12 +2,14 @@ import React, { useState, useEffect } from "react";
 import {
   View, Text, StyleSheet, SectionList, TouchableOpacity,
   SafeAreaView, ActivityIndicator, RefreshControl,
-  Modal, TextInput, KeyboardAvoidingView, Platform, ScrollView, Alert,
+  Modal, KeyboardAvoidingView, Platform, ScrollView, Alert,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useLocalSearchParams, useRouter } from "expo-router";
+import { AddressAutocomplete } from "@ride/maps-service/native";
 import { API_URL } from "@/constants/api";
 import { useAuth } from "@/context/AuthContext";
+import { useMapsClient } from "@/hooks/useMapsClient";
 
 interface Product {
   id: string;
@@ -29,7 +31,6 @@ interface StoreDetail {
   name: string;
   description: string | null;
   address: string;
-  phone: string;
   isOpen: boolean;
   rating: number;
   deliveryFee: string;
@@ -37,6 +38,8 @@ interface StoreDetail {
   openTime: string | null;
   closeTime: string | null;
   categories: Category[];
+  /** The shopping complex the store is in, when it is in one: it sets the fee and the delivery zone. */
+  complex: { name: string; deliveryRadiusKm: number } | null;
   _count: { products: number; orders: number };
 }
 
@@ -54,7 +57,11 @@ export default function StoreDetailScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [cart, setCart] = useState<Record<string, CartItem>>({});
   const [checkoutOpen, setCheckoutOpen] = useState(false);
+  const mapsClient = useMapsClient();
   const [deliveryAddress, setDeliveryAddress] = useState("");
+  // Set when the customer picks a suggestion; cleared when they type again, so a
+  // point is never sent for an address it does not belong to.
+  const [deliveryPoint, setDeliveryPoint] = useState<{ lat: number; lng: number } | null>(null);
   const [paymentMethod, setPaymentMethod] = useState<"CASH" | "CARD">("CASH");
   const [placing, setPlacing] = useState(false);
   const [orderSuccess, setOrderSuccess] = useState(false);
@@ -112,8 +119,9 @@ export default function StoreDetailScreen() {
           storeId: store.id,
           items: Object.values(cart).map((c) => ({ productId: c.product.id, quantity: c.qty })),
           deliveryAddress: deliveryAddress.trim(),
-          deliveryLat: 0,
-          deliveryLng: 0,
+          // The picked suggestion's point, or none: this used to send 0,0, a spot in
+          // the Gulf of Guinea. Without a point the server geocodes the address.
+          ...(deliveryPoint ? { deliveryLat: deliveryPoint.lat, deliveryLng: deliveryPoint.lng } : {}),
           paymentMethod,
         }),
       });
@@ -125,6 +133,7 @@ export default function StoreDetailScreen() {
         setCheckoutOpen(false);
         setOrderSuccess(false);
         setDeliveryAddress("");
+        setDeliveryPoint(null);
         router.push("/(tabs)/orders" as never);
       }, 1800);
     } catch (e: unknown) {
@@ -305,17 +314,25 @@ export default function StoreDetailScreen() {
 
                   {/* Delivery address */}
                   <Text style={styles.sectionLabel}>Delivery address</Text>
-                  <View style={styles.inputBox}>
+                  <View style={[styles.inputBox, { zIndex: 30 }]}>
                     <Ionicons name="location-outline" size={16} color="#64748b" />
-                    <TextInput
-                      style={styles.input}
-                      placeholder="e.g. 12 Main St, Soweto"
-                      placeholderTextColor="#475569"
+                    <AddressAutocomplete
+                      testID="delivery-address-input"
+                      client={mapsClient}
+                      placeholder="Start typing your address"
                       value={deliveryAddress}
-                      onChangeText={setDeliveryAddress}
-                      returnKeyType="done"
+                      onChangeText={(text) => { setDeliveryAddress(text); setDeliveryPoint(null); }}
+                      onSelect={(addr) => {
+                        setDeliveryAddress(addr.formatted);
+                        setDeliveryPoint({ lat: addr.lat, lng: addr.lng });
+                      }}
                     />
                   </View>
+                  {store.complex ? (
+                    <Text style={styles.zoneNote}>
+                      {store.complex.name} delivers within {store.complex.deliveryRadiusKm} km.
+                    </Text>
+                  ) : null}
 
                   {/* Payment method */}
                   <Text style={styles.sectionLabel}>Payment</Text>
@@ -444,6 +461,7 @@ const styles = StyleSheet.create({
     borderWidth: 1, borderColor: "#334155",
   },
   input: { flex: 1, color: "#f8fafc", fontSize: 14 },
+  zoneNote: { color: "#64748b", fontSize: 12, marginTop: 6 },
   payRow: { flexDirection: "row", gap: 12, marginBottom: 8 },
   payOption: {
     flex: 1, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8,

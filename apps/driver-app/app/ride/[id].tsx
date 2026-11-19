@@ -42,7 +42,8 @@ interface Ride {
   fareActual: number | null;
   vehicleType: string;
   paymentMethod: string;
-  customer: { name: string; phone: string };
+  /** The phone is sent only while the trip is active. */
+  customer: { name: string; phone?: string };
 }
 
 /**
@@ -82,13 +83,15 @@ export default function DriverRideScreen() {
 
   const fetchRide = useCallback(async () => {
     try {
-      const res = await fetch(`${API_URL}/api/rides/${id}`);
+      // With the token: since November 2026 a ride is readable only by its parties
+      // and an admin, and this read without one was answered with 401.
+      const res = await fetch(`${API_URL}/api/rides/${id}`, { headers: authHeaders });
       const json = await res.json();
       if (json.success) setRide(json.data);
     } finally {
       setLoading(false);
     }
-  }, [id]);
+  }, [id, token]);
 
   useEffect(() => { fetchRide(); }, [fetchRide]);
 
@@ -116,7 +119,8 @@ export default function DriverRideScreen() {
     setUpdating(true);
     try {
       const body: Record<string, unknown> = { status: action.next };
-      if (action.next === "COMPLETED") body.fareActual = ride.fareEstimate;
+      // No fare is sent on completion: the server sets it, and a price from the
+      // app was how a trip could be completed at R0.
       const res = await fetch(`${API_URL}/api/rides/${id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json", ...authHeaders },
@@ -206,11 +210,13 @@ export default function DriverRideScreen() {
             </View>
             <View style={{ flex: 1 }}>
               <Text style={styles.custName}>{ride.customer.name}</Text>
-              <Text style={styles.custPhone}>{ride.customer.phone}</Text>
+              {ride.customer.phone ? <Text style={styles.custPhone}>{ride.customer.phone}</Text> : null}
             </View>
-            <TouchableOpacity style={styles.callBtn} onPress={() => Linking.openURL(`tel:${ride.customer.phone}`)}>
-              <Ionicons name="call" size={18} color="#22c55e" />
-            </TouchableOpacity>
+            {ride.customer.phone ? (
+              <TouchableOpacity style={styles.callBtn} onPress={() => Linking.openURL(`tel:${ride.customer.phone}`)}>
+                <Ionicons name="call" size={18} color="#22c55e" />
+              </TouchableOpacity>
+            ) : null}
           </View>
         </View>
 
