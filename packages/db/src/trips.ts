@@ -155,6 +155,52 @@ export function feeOn(amount: number, percent: number): number {
  */
 export const OWED_LIMIT_RANDS = 500;
 
+/** The kinds of ledger row and the sign each carries towards what an operator owes. */
+export type LedgerKindName = "FEE_DUE" | "FEE_PAID" | "ADJUSTMENT";
+
+/**
+ * What an operator owes, derived from their ledger rows and never stored
+ * (AGENTS.md non-negotiable 3): fees due and adjustments add, payments subtract.
+ * Amounts come from Decimal columns, so they arrive as anything `Number()` reads.
+ */
+export function owedBalance(entries: { kind: LedgerKindName | string; amount: unknown }[]): number {
+  let cents = 0;
+  for (const e of entries) {
+    const value = Math.round(Number(String(e.amount)) * 100);
+    if (!Number.isFinite(value)) continue;
+    if (e.kind === "FEE_PAID") cents -= value;
+    else cents += value;
+  }
+  return cents / 100;
+}
+
+/** Why an operator who owes `owed` is paused, or null. */
+export function owedRefusal(owed: number): string | null {
+  return owed > OWED_LIMIT_RANDS
+    ? `You owe R${owed.toFixed(2)} in fees, over the R${OWED_LIMIT_RANDS} limit. Settle it to take new work.`
+    : null;
+}
+
+// ─── Operator documents ───────────────────────────────────────
+
+/** What an operator must have verified before they see a group trip (PLAN.md 3.7). */
+export const REQUIRED_OPERATOR_DOCUMENTS = ["DRIVING_PERMIT", "OPERATING_LICENCE", "VEHICLE_LICENCE", "INSURANCE"] as const;
+
+/**
+ * The required documents an operator is missing on `now`: never uploaded, not
+ * yet verified, rejected, or expired. An admin verifies; nothing approves itself.
+ */
+export function missingDocuments(
+  documents: { kind: string; status: string; expiresOn: Date | null }[],
+  now: Date = new Date()
+): string[] {
+  return REQUIRED_OPERATOR_DOCUMENTS.filter((kind) => {
+    const doc = documents.find((d) => d.kind === kind);
+    if (!doc || doc.status !== "VERIFIED") return true;
+    return doc.expiresOn !== null && doc.expiresOn.getTime() < now.getTime();
+  });
+}
+
 // ─── Tracked links ────────────────────────────────────────────
 
 /** Where a visit came from. Anything else counts as direct, so the label set stays small and known. */

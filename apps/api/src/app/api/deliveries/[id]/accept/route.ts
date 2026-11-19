@@ -11,6 +11,8 @@ import { orderSelect, presentOrder } from "@/lib/views";
 import { ACTIVE_DELIVERY_STATUSES, DISPATCHABLE_ORDER_STATUSES } from "@/lib/delivery";
 import { sendPushToUser } from "@/lib/notifications";
 import { logger } from "@/lib/logger";
+import { owedBy } from "@/lib/group-trips";
+import { owedRefusal } from "@ride/db/trips";
 
 /**
  * A rider takes a waiting delivery (PLAN.md Phase 2.3).
@@ -59,6 +61,8 @@ export const POST = withErrorHandler(async (req: NextRequest, ctx) => {
           ? riderAcceptRefusal(rider, otherActive, viewer, delivery.order)
           : "Not a registered rider";
         if (refusal) throw new AuthorizationError(refusal);
+        const paused = owedRefusal(await owedBy(tx, viewer.userId));
+        if (paused) throw new AuthorizationError(paused);
 
         const check = checkDeliveryTransition(delivery.status, "ASSIGNED", "RIDER");
         if (!check.allowed || delivery.riderId !== null) {

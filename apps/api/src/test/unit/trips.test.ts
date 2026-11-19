@@ -5,7 +5,10 @@ import {
   eventFunnel,
   feeOn,
   fitsTrip,
+  missingDocuments,
   newCheckInCode,
+  owedBalance,
+  owedRefusal,
   priceRefusal,
   seatPrice,
   seatsOf,
@@ -140,5 +143,50 @@ describe("the event funnel", () => {
     expect(funnel.requestsPerView).toBeNull();
     expect(funnel.spendPerBookedSeat).toBeNull();
     expect(funnel.net).toBe(-100);
+  });
+});
+
+describe("PLAN.md 3.8: what an operator owes", () => {
+  it("is fees due plus adjustments minus payments, to the cent, from Decimal-like values", () => {
+    const owed = owedBalance([
+      { kind: "FEE_DUE", amount: "10.10" },
+      { kind: "FEE_DUE", amount: { toString: () => "0.20" } },
+      { kind: "FEE_PAID", amount: "5.00" },
+      { kind: "ADJUSTMENT", amount: "-1.10" },
+    ]);
+    expect(owed).toBe(4.2);
+  });
+
+  it("pauses only above the limit, not at it", () => {
+    expect(owedRefusal(500)).toBeNull();
+    expect(owedRefusal(500.01)).toContain("R500.01");
+  });
+});
+
+describe("PLAN.md 3.7: operator documents", () => {
+  const now = new Date("2026-11-19T10:00:00Z");
+  const verified = (kind: string, expiresOn: Date | null = null) => ({ kind, status: "VERIFIED", expiresOn });
+
+  it("needs all four documents verified", () => {
+    expect(missingDocuments([], now)).toEqual(["DRIVING_PERMIT", "OPERATING_LICENCE", "VEHICLE_LICENCE", "INSURANCE"]);
+    expect(
+      missingDocuments(
+        [verified("DRIVING_PERMIT"), verified("OPERATING_LICENCE"), verified("VEHICLE_LICENCE"), verified("INSURANCE")],
+        now
+      )
+    ).toEqual([]);
+  });
+
+  it("counts a pending, rejected or expired document as missing", () => {
+    const missing = missingDocuments(
+      [
+        { kind: "DRIVING_PERMIT", status: "PENDING", expiresOn: null },
+        { kind: "OPERATING_LICENCE", status: "REJECTED", expiresOn: null },
+        verified("VEHICLE_LICENCE", new Date("2026-11-18T00:00:00Z")),
+        verified("INSURANCE", new Date("2027-01-01T00:00:00Z")),
+      ],
+      now
+    );
+    expect(missing).toEqual(["DRIVING_PERMIT", "OPERATING_LICENCE", "VEHICLE_LICENCE"]);
   });
 });

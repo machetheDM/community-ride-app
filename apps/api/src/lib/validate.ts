@@ -260,3 +260,32 @@ export const driverUpdateSchema = z
     message: "currentLat and currentLng must be sent together",
     path: ["currentLat"],
   });
+
+// ─── Event group trips (docs/PLAN.md Phase 3.4 to 3.9) ───────
+
+const rands = z.coerce.number().positive("Offer a price per seat in rands").max(10_000);
+
+/**
+ * A passenger's request for seats. There is no total and no fee here: the
+ * server prices the floor from the pickup point and the venue, and refuses an
+ * offer below it (threat model PL-1).
+ */
+export const tripRequestCreateSchema = z.object({
+  pickupPointId: z.string().min(1).max(64),
+  direction: z.enum(["TO_EVENT", "FROM_EVENT"]).default("TO_EVENT"),
+  seats: z.coerce.number().int().min(1).max(6),
+  pricePerSeat: rands,
+  channel: z.string().max(16).optional(),
+});
+
+export const counterSchema = z.object({ pricePerSeat: rands });
+
+export const counterResponseSchema = z.object({ accept: z.boolean() });
+
+export const checkInSchema = z.object({ code: z.string().regex(/^\d{4}$/, "The boarding code is 4 digits") });
+
+export const operatorDocumentSchema = z.object({
+  kind: z.enum(["DRIVING_PERMIT", "OPERATING_LICENCE", "VEHICLE_LICENCE", "INSURANCE"]),
+  reference: z.string().trim().min(4, "Enter the document number").max(40),
+  expiresOn: z.coerce.date().optional(),
+});

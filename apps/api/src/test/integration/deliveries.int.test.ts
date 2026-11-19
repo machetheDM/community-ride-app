@@ -47,6 +47,10 @@ describe("a delivery", () => {
     const order = await prisma.order.findUniqueOrThrow({ where: { id: orderId } });
     expect(order.status).toBe("DELIVERED");
     expect(order.deliveredAt).not.toBeNull();
+    const owed = await prisma.ledgerEntry.findMany({ where: { sourceType: "DELIVERY", sourceId: deliveryId } });
+    expect(owed).toHaveLength(1);
+    expect(owed[0]).toMatchObject({ kind: "FEE_DUE", operatorUserId: rider.userId });
+    expect(owed[0].amount.toFixed(2)).toBe("1.50");
     const actions = [...(await auditRows(deliveryId)), ...(await auditRows(orderId))].map((a) => a.action);
     expect(actions).toEqual(
       expect.arrayContaining(["delivery.pick_up", "delivery.en_route", "delivery.deliver", "order.out_for_delivery", "order.delivered"])

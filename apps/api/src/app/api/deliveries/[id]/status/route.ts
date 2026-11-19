@@ -1,4 +1,6 @@
 import { NextRequest } from "next/server";
+import { feeOn } from "@ride/db/trips";
+import { loadPricingPolicy } from "@/lib/fare";
 import { recordAudit, recordAuditStrict } from "@ride/db";
 import {
   checkDeliveryTransition,
@@ -118,6 +120,14 @@ async function transition(
 
   const orderStep = ORDER_STATUS_FOR_DELIVERY[to];
   const now = new Date();
+  // Our share of the delivery fee the rider collects, owed by the rider (PLAN.md 3.8).
+  const fee =
+    to === "DELIVERED"
+      ? feeOn(
+          Number((await prisma.order.findUniqueOrThrow({ where: { id: current.orderId }, select: { deliveryFee: true } })).deliveryFee),
+          (await loadPricingPolicy()).platformFeePercent
+        )
+      : 0;
 
   const delivery = await prisma.$transaction(async (tx) => {
     const written = await tx.delivery.updateMany({
@@ -131,6 +141,12 @@ async function transition(
       },
     });
     if (written.count !== 1) throw new ConflictError("This delivery changed while you were updating it; reload it");
+
+    if (fee > 0) {
+      await tx.ledgerEntry.create({
+        data: { operatorUserId: viewer.userId, kind: "FEE_DUE", amount: fee.toFixed(2), sourceType: "DELIVERY", sourceId: id },
+      });
+    }
 
     await recordAuditStrict(tx, {
       actorUserId: viewer.userId,
