@@ -2,6 +2,7 @@ import { describe, it, expect } from "@jest/globals";
 import {
   counterRefusal,
   departureFor,
+  eventFunnel,
   feeOn,
   fitsTrip,
   newCheckInCode,
@@ -103,5 +104,41 @@ describe("seats, codes and fees", () => {
   it("take the fee to the cent", () => {
     expect(feeOn(450, 15)).toBe(67.5);
     expect(feeOn(99.99, 12)).toBe(12);
+  });
+});
+
+describe("the event funnel", () => {
+  it("says whether promoting the event paid, with ratios only where they mean something", () => {
+    const funnel = eventFunnel({
+      visits: [
+        { channel: "wa", count: 40 },
+        { channel: "fb", count: 160 },
+      ],
+      requests: [
+        { status: "COMPLETED", seats: 2 },
+        { status: "BOOKED", seats: 3 },
+        { status: "WAITING", seats: 1 },
+        { status: "CANCELLED", seats: 4 },
+      ],
+      fees: 67.5,
+      spend: 150,
+    });
+    expect(funnel).toMatchObject({
+      views: 200,
+      requests: 4,
+      seatsRequested: 10,
+      seatsBooked: 5,
+      requestsPerView: 0.02,
+      net: -82.5,
+      spendPerBookedSeat: 30,
+    });
+    expect(funnel.viewsByChannel[0]).toEqual({ channel: "fb", count: 160 });
+  });
+
+  it("gives null ratios, not zero, when nothing was seen or booked", () => {
+    const funnel = eventFunnel({ visits: [], requests: [], fees: 0, spend: 100 });
+    expect(funnel.requestsPerView).toBeNull();
+    expect(funnel.spendPerBookedSeat).toBeNull();
+    expect(funnel.net).toBe(-100);
   });
 });

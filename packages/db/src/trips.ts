@@ -154,3 +154,55 @@ export function feeOn(amount: number, percent: number): number {
  * makes "owed" mean anything (PLAN.md 3.8).
  */
 export const OWED_LIMIT_RANDS = 500;
+
+// ─── Tracked links ────────────────────────────────────────────
+
+/** Where a visit came from. Anything else counts as direct, so the label set stays small and known. */
+export const VISIT_CHANNELS = ["fb", "wa", "sms", "ig", "poster", "direct"] as const;
+export type VisitChannel = (typeof VISIT_CHANNELS)[number];
+
+export function visitChannel(value: unknown): VisitChannel {
+  const v = typeof value === "string" ? value.trim().toLowerCase() : "";
+  return (VISIT_CHANNELS as readonly string[]).includes(v) ? (v as VisitChannel) : "direct";
+}
+
+// ─── The event funnel ─────────────────────────────────────────
+
+export interface FunnelInput {
+  visits: { channel: string; count: number }[];
+  requests: { status: string; seats: number }[];
+  /** Fees owed to us from this event's completed trips. */
+  fees: number;
+  /** What promoting the event cost. */
+  spend: number;
+}
+
+/** Statuses in which a passenger's seats were taken by an operator. */
+const BOOKED_STATUSES = ["BOOKED", "BOARDED", "COMPLETED", "NO_SHOW"];
+
+/**
+ * One event's funnel (docs/PLAN.md §4, lane 1b step 10): page views by channel,
+ * requests, seats booked, fees earned and promotion spent. The question it
+ * answers is whether promoting the event paid for itself (`net`); the decision it
+ * informs is whether to keep promoting that venue's events. Ratios are null where
+ * the denominator is zero, never a division by zero dressed up as 0%.
+ */
+export function eventFunnel(input: FunnelInput) {
+  const views = input.visits.reduce((sum, v) => sum + v.count, 0);
+  const requests = input.requests.length;
+  const seatsRequested = input.requests.reduce((sum, r) => sum + r.seats, 0);
+  const seatsBooked = input.requests.filter((r) => BOOKED_STATUSES.includes(r.status)).reduce((sum, r) => sum + r.seats, 0);
+  const round2 = (n: number) => Math.round(n * 100) / 100;
+  return {
+    views,
+    viewsByChannel: [...input.visits].sort((a, b) => b.count - a.count),
+    requests,
+    seatsRequested,
+    seatsBooked,
+    requestsPerView: views > 0 ? round2(requests / views) : null,
+    fees: round2(input.fees),
+    spend: round2(input.spend),
+    net: round2(input.fees - input.spend),
+    spendPerBookedSeat: seatsBooked > 0 ? round2(input.spend / seatsBooked) : null,
+  };
+}

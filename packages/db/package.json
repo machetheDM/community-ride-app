@@ -17,7 +17,8 @@
     "./otp": "./src/otp.ts",
     "./session": "./src/session.ts",
     "./dispatch": "./src/dispatch.ts",
-    "./trips": "./src/trips.ts"
+    "./trips": "./src/trips.ts",
+    "./poster": "./src/poster.ts"
   },
   "dependencies": {
     "@prisma/adapter-pg": "^7.10.1",

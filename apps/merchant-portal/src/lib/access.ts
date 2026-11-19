@@ -33,6 +33,9 @@ export type NavIcon =
   | "analytics"
   | "stores"
   | "complexes"
+  | "venues"
+  | "events"
+  | "operators"
   | "drivers"
   | "riders"
   | "users"
@@ -53,6 +56,9 @@ export const PORTAL_PAGES: readonly PortalPage[] = [
   { href: "/dashboard/analytics", label: "Analytics", icon: "analytics", access: "admin" },
   { href: "/dashboard/stores", label: "Stores", icon: "stores", access: "admin" },
   { href: "/dashboard/complexes", label: "Complexes", icon: "complexes", access: "admin" },
+  { href: "/dashboard/venues", label: "Venues", icon: "venues", access: "admin" },
+  { href: "/dashboard/events", label: "Events", icon: "events", access: "admin" },
+  { href: "/dashboard/operators", label: "Operators", icon: "operators", access: "admin" },
   { href: "/dashboard/drivers", label: "Drivers", icon: "drivers", access: "admin" },
   { href: "/dashboard/riders", label: "Riders", icon: "riders", access: "admin" },
   { href: "/dashboard/users", label: "Users", icon: "users", access: "admin" },
