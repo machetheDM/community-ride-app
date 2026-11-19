@@ -5,8 +5,9 @@ const isDev = process.env.NODE_ENV !== "production";
 
 /**
  * Headers for the public pages (`/e/{slug}`, the event pages a Facebook post links
- * to). `src/proxy.ts` covers `/api` only, so without this the one part of the API
- * app a stranger opens in a browser would carry no headers at all.
+ * to, and `/t/{token}`, the share-my-trip page). `src/proxy.ts` covers `/api`
+ * only, so without this the one part of the API app a stranger opens in a
+ * browser would carry no headers at all.
  *
  * The CSP follows the portal's (apps/merchant-portal/next.config.ts): the App
  * Router's inline RSC scripts need `'unsafe-inline'` until a per-request nonce is
@@ -40,7 +41,19 @@ const publicPageHeaders = [
 const nextConfig: NextConfig = {
   poweredByHeader: false,
   async headers() {
-    return [{ source: "/e/:path*", headers: publicPageHeaders }];
+    return [
+      { source: "/e/:path*", headers: publicPageHeaders },
+      // The share-my-trip page: its token is in the path, so no referrer leaves it.
+      {
+        source: "/t/:path*",
+        headers: [
+          ...publicPageHeaders.filter((h) => h.key !== "Referrer-Policy"),
+          { key: "Referrer-Policy", value: "no-referrer" },
+          { key: "Cache-Control", value: "private, no-store" },
+          { key: "X-Robots-Tag", value: "noindex, nofollow" },
+        ],
+      },
+    ];
   },
   allowedDevOrigins: ["127.0.0.1"],
   images: {

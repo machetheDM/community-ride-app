@@ -325,6 +325,7 @@ describe("PLAN.md 3.8 and 3.9: boarding, completion, the ledger and sharing", ()
     await operatorCall(accept, tripIds[0] as string, await createOperator());
 
     const path = (await myList(passengers[0]))[0].sharePath as string;
+    expect(path).toMatch(/^\/t\/[0-9a-f]{40}$/);
     const token = path.split("/").pop() as string;
     const res = await call(share, request("GET", path), { token });
 

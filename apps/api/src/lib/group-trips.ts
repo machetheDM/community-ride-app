@@ -445,7 +445,51 @@ export function presentMyRequest(r: MyRequestRecord) {
         : null,
     checkInCode: r.status === "BOOKED" && r.checkInCodeEnc ? decryptField(r.checkInCodeEnc) : null,
     sharePath:
-      booked && r.groupTrip && ["BOOKED", "BOARDED"].includes(r.status) ? `/api/trips/share/${shareTokenFor(r.groupTrip.id)}` : null,
+      booked && r.groupTrip && ["BOOKED", "BOARDED"].includes(r.status) ? `/t/${shareTokenFor(r.groupTrip.id)}` : null,
+  };
+}
+
+// ─── Share-my-trip ────────────────────────────────────────────
+
+/** A share link works until this long after the trip finishes. */
+export const SHARE_LINK_HOURS_AFTER = 12;
+
+/**
+ * The trip behind a share token (PLAN.md 3.9), or null. The token is 160 bits
+ * and looked up by its keyed hash, so the database never holds a usable link.
+ * It shows the event, the pickup point, when it leaves, the operator's first
+ * name and the vehicle with its plate: no passenger names, no phone numbers, no
+ * live position. It stops working 12 hours after the trip completes.
+ */
+export async function loadSharedTrip(token: string) {
+  if (!/^[0-9a-f]{40}$/.test(token)) return null;
+  const trip = await prisma.groupTrip.findUnique({
+    where: { shareTokenHash: shareTokenHash(token) },
+    select: {
+      status: true,
+      departAt: true,
+      completedAt: true,
+      direction: true,
+      event: { select: { title: true, venue: { select: { name: true } } } },
+      pickupPoint: { select: { name: true, address: true } },
+      driver: {
+        select: {
+          user: { select: { name: true } },
+          vehicle: { select: { make: true, model: true, color: true, licensePlate: true } },
+        },
+      },
+    },
+  });
+  const expired = trip?.completedAt && Date.now() - trip.completedAt.getTime() > SHARE_LINK_HOURS_AFTER * 3_600_000;
+  if (!trip || !trip.driver || !["BOOKED", "COMPLETED"].includes(trip.status) || expired) return null;
+  return {
+    status: trip.status,
+    direction: trip.direction,
+    departAt: trip.departAt,
+    event: trip.event.title,
+    venue: trip.event.venue.name,
+    pickupPoint: trip.pickupPoint,
+    operator: { firstName: firstName(trip.driver.user.name), vehicle: trip.driver.vehicle },
   };
 }
 

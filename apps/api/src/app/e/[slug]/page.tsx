@@ -10,7 +10,7 @@ export const dynamic = "force-dynamic";
 const SITE = process.env.PUBLIC_EVENTS_URL ?? "http://localhost:3000";
 
 /** The scheme the customer app registers (apps/customer-app/app.json). */
-const APP_LINK = "community-ride://events/";
+const APP_LINK = "community-ride://event/";
 
 async function loadEvent(slug: string) {
   const event = await prisma.event.findUnique({ where: { slug }, select: publicEventSelect });
