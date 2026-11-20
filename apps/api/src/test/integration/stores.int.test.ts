@@ -15,8 +15,11 @@ afterAll(async () => {
 describe("threat model finding 13: store responses", () => {
   it("do not carry the merchant id in the list, the value that forged the old portal cookie", async () => {
     const { storeId, merchant } = await createStore();
+    // The list returns 50 stores at most, best-rated first, and the other suites'
+    // stores share this database: search for this store so it is in the page.
+    const { name } = await prisma.store.findUniqueOrThrow({ where: { id: storeId }, select: { name: true } });
 
-    const res = await call(listStores, request("GET", "/api/stores"));
+    const res = await call(listStores, request("GET", `/api/stores?search=${encodeURIComponent(name)}`));
 
     expect(res.status).toBe(200);
     expect((res.body.data as { id: string }[]).some((s) => s.id === storeId)).toBe(true);
@@ -45,5 +48,40 @@ describe("threat model finding 13: store responses", () => {
     const res = await call(getStore, request("GET", `/api/stores/${storeId}`), { id: storeId });
 
     expect(res.status).toBe(404);
+  });
+});
+
+describe("the delivery fee a store page quotes", () => {
+  it("is the complex's fee for a store in an active complex, with the complex's name and radius", async () => {
+    const { storeId } = await createStore({ complex: { fee: "18.00", radiusKm: 6 } });
+
+    const res = await call(getStore, request("GET", `/api/stores/${storeId}`), { id: storeId });
+
+    expect(data(res)).toMatchObject({ deliveryFee: "18", complex: { deliveryRadiusKm: 6 } });
+    expect((data(res).complex as { name: string }).name).toMatch(/^Test Complex/);
+    // The raw complex row (its own fee field, isActive) is not passed through.
+    expect(res.text).not.toContain("isActive");
+  });
+
+  it("is the store's own fee for a stand-alone store or one in an inactive complex", async () => {
+    const alone = await createStore();
+    const dormant = await createStore({ complex: { fee: "18.00", active: false } });
+
+    for (const { storeId } of [alone, dormant]) {
+      const res = await call(getStore, request("GET", `/api/stores/${storeId}`), { id: storeId });
+      expect(data(res)).toMatchObject({ deliveryFee: "15", complex: null });
+    }
+  });
+
+  it("matches what the list quotes", async () => {
+    const { storeId } = await createStore({ complex: { fee: "18.00" } });
+    // Searched by its own name: the list is capped at 50, and this database
+    // holds every store the other tests made.
+    const { name } = await prisma.store.findUniqueOrThrow({ where: { id: storeId }, select: { name: true } });
+
+    const res = await call(listStores, request("GET", `/api/stores?search=${encodeURIComponent(name)}`));
+
+    const listed = (res.body.data as { id: string; deliveryFee: string }[]).find((s) => s.id === storeId);
+    expect(listed?.deliveryFee).toBe("18");
   });
 });

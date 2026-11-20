@@ -70,6 +70,7 @@ const ALLOWED_ORDER_MOVES = new Set([
 ]);
 
 const ALLOWED_DELIVERY_MOVES = new Set([
+  "PENDING>ASSIGNED:RIDER",
   "ASSIGNED>PICKED_UP:RIDER",
   "PICKED_UP>EN_ROUTE:RIDER",
   "EN_ROUTE>DELIVERED:RIDER",
@@ -205,8 +206,14 @@ describe("delivery lifecycle", () => {
     expect(wrong).toEqual([]);
   });
 
-  it("has no move into ASSIGNED, because dispatch is not built yet", () => {
-    for (const from of DELIVERY_STATUSES) expect(canTransitionDelivery(from, "ASSIGNED", "RIDER")).toBe(false);
+  it("reaches ASSIGNED only from PENDING, by a rider accepting it", () => {
+    for (const from of DELIVERY_STATUSES) {
+      expect(canTransitionDelivery(from, "ASSIGNED", "RIDER")).toBe(from === "PENDING");
+    }
+  });
+
+  it("leaves the order alone when a rider accepts: the store is still preparing it", () => {
+    expect(ORDER_STATUS_FOR_DELIVERY.ASSIGNED).toBeUndefined();
   });
 
   it("moves the order only along order moves the table gives to the delivery lifecycle", () => {

@@ -1,4 +1,4 @@
-import { sendPushToUser as sendOne } from "@ride/push-service";
+import { sendPushToMany as sendMany, sendPushToUser as sendOne } from "@ride/push-service";
 
 /**
  * Order notifications from the merchant portal.
@@ -16,4 +16,14 @@ export function sendPushToUser(
   data?: Record<string, unknown>
 ): Promise<number> {
   return sendOne(pushToken, title, body, data);
+}
+
+/** One message to many devices: the new-delivery push to nearby riders. */
+export function sendPushToMany(
+  pushTokens: Array<string | null | undefined>,
+  title: string,
+  body: string,
+  data?: Record<string, unknown>
+): Promise<number> {
+  return sendMany(pushTokens, title, body, data);
 }

@@ -110,9 +110,10 @@ and refuses to save a model that fails to beat the Google Maps baseline.
   shared store; this is stated rather than implied.
 - **Known advisories, gated** — CI fails on any high or critical advisory unless
   [`security/audit-exceptions.json`](security/audit-exceptions.json) accepts it
-  with a reason and an expiry date (`scripts/audit-gate.mjs`). Six are accepted
-  today, all in Expo SDK 52 and React Native build tooling, until the SDK upgrade;
-  none is present in the API's deployable build (checked 5 November 2026).
+  with a reason and an expiry date (`scripts/audit-gate.mjs`). None is accepted
+  today: the six Expo SDK 52 build-tooling advisories listed there before cleared
+  with the SDK 58 upgrade (19 November 2026). Moderate advisories are reported,
+  not gated.
 
 ### Google Maps Platform
 
@@ -125,8 +126,8 @@ three deliberately separate entry points:
 | `@ride/maps-service/client` | Fetch client for the API proxy | Both Expo apps |
 | `@ride/maps-service/native` | `AddressAutocomplete`, `RouteMap` | Both Expo apps |
 
-The split is load-bearing twice over. The API is on React 19 while Expo pins 18.3.1, so React must
-not appear in the package's main entry. And the server client holds the billable API key, so it
+The split is load-bearing twice over. The Expo apps pin the exact React their SDK ships (19.3.0)
+while the web apps move with Next.js, so React must not appear in the package's main entry. And the server client holds the billable API key, so it
 must be impossible to import it from a mobile bundle by accident.
 
 **Two keys, not one.** The Maps SDK render key ships inside the app binaries — that is unavoidable
@@ -253,12 +254,36 @@ accepts a price from the client.
 - `POST /api/maps/route` — route with polyline
 - `POST /api/maps/eta` — travel time and distance
 - `POST /api/maps/autocomplete` — address suggestions; `PUT` resolves the selection
-- `PATCH /api/deliveries/[id]/status` — rider-side delivery lifecycle
+- `GET /api/deliveries/available` — waiting deliveries within 10 km of an approved, online
+  scooter rider, nearest store first; a suburb and a rounded distance, nothing that
+  identifies the customer
+- `POST /api/deliveries/[id]/accept` — take a waiting delivery (two riders at once: one
+  wins, one gets 409; one job per rider)
+- `PATCH /api/deliveries/[id]/status` — the assigned rider's pickup, en route and handover;
+  "delivered" needs the customer's 4-digit code, and five wrong codes lock it for support
+- `GET`, `PATCH /api/riders/me` — a scooter rider's profile, online status and position
 - `GET /api/orders`, `GET /api/orders/[id]` — orders scoped to the caller (customer,
   store's merchant, assigned rider, or admin)
 - `POST /api/orders` — place an order: priced on the server in one transaction, products
   must belong to the store, stock checked
 - `GET /api/drivers` — the operator roster, ADMIN only
+
+**Events and group trips** (Phase 3; decisions in [`docs/adr`](docs/adr/README.md)):
+- `GET /api/events`, `GET /api/events/[slug]`, `GET /api/events/[slug]/poster` — published
+  events only, with pickup points and the floor price per seat; drafts answer 404
+- `/e/[slug]` — the public event page a Facebook post links to; its link preview is the poster,
+  and it counts views per channel (`?src=fb`) without recording who looked
+- `POST /api/events/[slug]/trip-requests` — a passenger offers a price per seat; below the
+  server's floor is refused, and requests from one pickup point pool into trips of up to 15
+- `GET /api/trip-requests`, `POST …/[id]/cancel`, `POST …/[id]/respond` — my trips, with the
+  operator, plate, boarding code and share link once booked; answer a counter-offer
+- `GET /api/group-trips/available`, `GET /api/group-trips/mine` — offers for an operator whose
+  four documents an admin has verified and who owes under R500; nothing for anyone else
+- `POST /api/group-trips/[id]/accept | counter | check-in | complete` — first acceptance wins
+  (one 200, one 409); one counter per trip; boarding by code; completion records the fee
+- `GET /api/trips/share/[token]` — share-my-trip: the vehicle and plate, never who is on board
+- `GET`, `POST /api/operators/me/documents`, `GET /api/operators/me/statement` — documents
+  (numbers encrypted, last four shown) and fees owed, derived from the ledger
 
 All endpoints return consistent JSON and validate input with Zod. Every route that reads or
 changes someone's data checks the caller's role and status in the database on each request
@@ -276,7 +301,15 @@ API.
 - **Overview**: revenue metrics, open stores, pending orders, recent activity
 - **Orders**: live order board with status actions (confirm, prepare, ready, deliver, cancel)
 - **My Store**: open/close toggle, store details, ratings
-- **Admin pages**: Stores, Drivers, Riders, Users, Payments, Settings
+- **Admin pages**: Stores, Complexes, Drivers, Riders, Users, Payments, Settings
+- **Venues and events**: partner venues with their agreement, public pickup points, events with
+  a poster stripped of its metadata, publish and cancel, share links per channel, and each
+  event's funnel (views, requests, seats booked, fees against promotion spend)
+- **Operators**: verify or reject documents, each operator's statement, and payments and
+  adjustments recorded as ledger events (no stored balance)
+- **Complexes**: an admin adds a shopping complex (one delivery fee and one delivery radius
+  for every store in it) and places stores in it; orders from outside the radius are
+  refused at checkout
 
 ### `apps/customer-app` — Customer App
 - Phone OTP login
@@ -288,7 +321,7 @@ API.
 - Driver online/offline toggle
 - Available rides feed with one-tap accept
 - Status flow: Accepted → En Route → Arrived → In Progress → Completed
-- Delivery status updates by the assigned scooter rider (assigning a rider to an order is not built yet)
+- Scooter riders: nearby delivery jobs, accept, pickup, en route, and handover by the customer's code
 
 ## Tech Stack
 
@@ -296,7 +329,7 @@ API.
 |---|---|
 | Monorepo | npm workspaces |
 | Web | Next.js 16, App Router, Turbopack, Tailwind CSS v4 |
-| Mobile | Expo SDK, Expo Router v4, React Native |
+| Mobile | Expo SDK 58, Expo Router, React Native 0.88 |
 | Language | TypeScript (strict) |
 | Database | PostgreSQL (Supabase) |
 | ORM | Prisma 7 + `@prisma/adapter-pg` |

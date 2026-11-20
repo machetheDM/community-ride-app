@@ -198,10 +198,42 @@ export const otpVerifySchema = z.object({
   code: z.string().length(6, "OTP must be 6 digits"),
 });
 
-export const deliveryStatusSchema = z.object({
-  status: z.enum(DELIVERY_STATUSES),
-  failReason: reasonSchema,
-});
+/** The 4-digit handover code a customer reads out at the door. */
+export const handoverCodeSchema = z.string().regex(/^\d{4}$/, "The handover code is 4 digits");
+
+/**
+ * A rider's move on a delivery they hold. Accepting one is its own route
+ * (`deliveries/[id]/accept`), because it checks the rider's standing rather than
+ * their assignment, so PENDING and ASSIGNED are not statuses a rider can send.
+ * DELIVERED needs the customer's handover code (PLAN.md Phase 2.5).
+ */
+export const deliveryStatusSchema = z
+  .object({
+    status: z.enum(DELIVERY_STATUSES).refine((s) => s !== "PENDING" && s !== "ASSIGNED", {
+      message: "Accept a delivery with POST /api/deliveries/{id}/accept",
+    }),
+    failReason: reasonSchema,
+    handoverCode: handoverCodeSchema.optional(),
+  })
+  .refine((d) => d.status !== "DELIVERED" || d.handoverCode !== undefined, {
+    message: "Ask the customer for their 4-digit handover code",
+    path: ["handoverCode"],
+  });
+
+/**
+ * A scooter rider's own status and position: the same rules as a driver's,
+ * without a heading, which nothing on the delivery side reads.
+ */
+export const riderUpdateSchema = z
+  .object({
+    isOnline: z.boolean().optional(),
+    currentLat: z.number().min(-90).max(90).optional(),
+    currentLng: z.number().min(-180).max(180).optional(),
+  })
+  .refine((d) => (d.currentLat === undefined) === (d.currentLng === undefined), {
+    message: "currentLat and currentLng must be sent together",
+    path: ["currentLat"],
+  });
 
 export const pushTokenSchema = z.object({
   // Bounded: this value is stored and later sent upstream. Expo tokens run to
@@ -228,3 +260,32 @@ export const driverUpdateSchema = z
     message: "currentLat and currentLng must be sent together",
     path: ["currentLat"],
   });
+
+// ─── Event group trips (docs/PLAN.md Phase 3.4 to 3.9) ───────
+
+const rands = z.coerce.number().positive("Offer a price per seat in rands").max(10_000);
+
+/**
+ * A passenger's request for seats. There is no total and no fee here: the
+ * server prices the floor from the pickup point and the venue, and refuses an
+ * offer below it (threat model PL-1).
+ */
+export const tripRequestCreateSchema = z.object({
+  pickupPointId: z.string().min(1).max(64),
+  direction: z.enum(["TO_EVENT", "FROM_EVENT"]).default("TO_EVENT"),
+  seats: z.coerce.number().int().min(1).max(6),
+  pricePerSeat: rands,
+  channel: z.string().max(16).optional(),
+});
+
+export const counterSchema = z.object({ pricePerSeat: rands });
+
+export const counterResponseSchema = z.object({ accept: z.boolean() });
+
+export const checkInSchema = z.object({ code: z.string().regex(/^\d{4}$/, "The boarding code is 4 digits") });
+
+export const operatorDocumentSchema = z.object({
+  kind: z.enum(["DRIVING_PERMIT", "OPERATING_LICENCE", "VEHICLE_LICENCE", "INSURANCE"]),
+  reference: z.string().trim().min(4, "Enter the document number").max(40),
+  expiresOn: z.coerce.date().optional(),
+});

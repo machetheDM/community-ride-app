@@ -18,8 +18,8 @@ import type {
  * The only key that ships in the apps is the Maps SDK render key, which is
  * bundle-restricted and whose SKU is free at unlimited volume.
  *
- * No React here — this file is imported by both Expo apps, which pin React 18.3.1
- * while the API is on React 19.
+ * No React here — this file is imported by both Expo apps, which pin the exact
+ * React their SDK ships, while the API's React moves with Next.js.
  */
 
 export interface MapsClientOptions {

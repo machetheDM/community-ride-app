@@ -4,12 +4,13 @@
  * dependencies, unless security/audit-exceptions.json accepts it with a reason and
  * an expiry date (PRACTICES ALL-4, DSO-2).
  *
- * A plain `npm audit --audit-level=high` cannot be used here: the Expo SDK 52
- * build tooling carries advisories that only the SDK upgrade clears, so the job
- * would be red on every run, and a check that is always red is ignored as surely
- * as one that never runs. An exception file keeps the gate blocking for anything
- * new, makes every accepted risk visible in review, and turns red again on the
- * day an exception expires.
+ * Why an exception file rather than a plain `npm audit --audit-level=high`: an
+ * advisory with no fix yet would turn the job red on every run, and a check that
+ * is always red is ignored as surely as one that never runs. The file keeps the
+ * gate blocking for anything new, makes every accepted risk visible in review,
+ * and turns red again on the day an exception expires. It was written for the six
+ * Expo SDK 52 build-tooling advisories; the SDK 58 upgrade cleared them, and the
+ * file is empty now.
  *
  *   node scripts/audit-gate.mjs            uses `npm audit --omit=dev --json`
  *   node scripts/audit-gate.mjs report.json   reads a saved report instead

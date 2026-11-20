@@ -57,6 +57,14 @@ const nextConfig: NextConfig = {
     remotePatterns: [{ protocol: "https", hostname: "**.supabase.co" }],
   },
   serverExternalPackages: ["@prisma/client"],
+  experimental: {
+    serverActions: {
+      // Up from the 1 MB default for the event poster upload (2 MB poster plus the
+      // form around it). Every action still checks the admin session itself, and
+      // sanitizePoster refuses anything over 2 MB.
+      bodySizeLimit: "3mb",
+    },
+  },
   // Says which framework served the page, and nothing a merchant needs.
   poweredByHeader: false,
   async headers() {

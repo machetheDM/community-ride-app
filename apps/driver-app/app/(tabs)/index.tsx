@@ -1,12 +1,15 @@
 import React, { useState, useEffect, useCallback, useRef } from "react";
 import {
-  View, Text, StyleSheet, TouchableOpacity, SafeAreaView, Switch,
+  View, Text, StyleSheet, TouchableOpacity, Switch,
   ScrollView, ActivityIndicator, RefreshControl, Alert,
 } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import { useAuth } from "@/context/AuthContext";
 import { API_URL } from "@/constants/api";
+import { RiderHome } from "@/components/RiderHome";
+import { positionMessage, useReportPosition } from "@/hooks/useReportPosition";
 
 interface DriverProfile {
   id: string;
@@ -18,28 +21,58 @@ interface DriverProfile {
   vehicle: { make: string; model: string; color: string; licensePlate: string } | null;
 }
 
+/**
+ * A waiting request, as GET /api/rides/available returns it since November 2026:
+ * suburbs and rounded distances, never the customer's name, phone or exact
+ * address, which come with the ride once it is accepted (threat model RD-7).
+ * This screen still read the old shape until Phase 2, so the cards showed blanks.
+ */
 interface AvailableRide {
   id: string;
-  pickupAddress: string;
-  dropoffAddress: string;
-  fareEstimate: number;
+  pickupArea: string | null;
+  dropoffArea: string | null;
+  distanceKm: number;
+  pickupDistanceKm: number | null;
+  fareEstimate: number | string;
   vehicleType: string;
-  status: string;
-  customer: { name: string; phone: string };
 }
 
-export default function DriverDashboard() {
+/** A ride this driver holds, from GET /api/rides: the parties see the addresses and a first name. */
+interface ActiveRide {
+  id: string;
+  status: string;
+  dropoffAddress: string;
+  fareEstimate: number | string;
+  customer: { name: string; phone?: string };
+}
+
+/**
+ * The operator app serves drivers and scooter riders. A rider gets the delivery
+ * home; everyone else the driver dashboard. A wrapper, so neither screen's hooks
+ * run for the other role.
+ */
+export default function Home() {
+  const { user } = useAuth();
+  return user?.role === "RIDER" ? <RiderHome /> : <DriverDashboard />;
+}
+
+function DriverDashboard() {
   const router = useRouter();
   const { user, token } = useAuth();
   const [driver, setDriver] = useState<DriverProfile | null>(null);
   const [rides, setRides] = useState<AvailableRide[]>([]);
-  const [activeRide, setActiveRide] = useState<AvailableRide | null>(null);
+  const [activeRide, setActiveRide] = useState<ActiveRide | null>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [toggling, setToggling] = useState(false);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const authHeaders = token ? { Authorization: `Bearer ${token}` } : undefined;
+
+  // Without a reported position the API cannot say how far a pickup is, and the
+  // customer never gets the "driver arriving" alert. The app never sent one.
+  const { state: positionState } = useReportPosition("/api/drivers/me", token, Boolean(driver?.isOnline));
+  const locationNote = driver?.isOnline ? positionMessage(positionState) : null;
 
   const fetchDriver = useCallback(async () => {
     if (!token) return;
@@ -58,8 +91,8 @@ export default function DriverDashboard() {
       // Active ride this driver is already handling
       const activeRes = await fetch(`${API_URL}/api/rides?active=true`, { headers: authHeaders });
       const activeJson = await activeRes.json();
-      const mine: AvailableRide[] = (activeJson.data?.items ?? []).filter(
-        (r: AvailableRide) => r.status !== "REQUESTED"
+      const mine: ActiveRide[] = (activeJson.data?.items ?? []).filter(
+        (r: ActiveRide) => r.status !== "REQUESTED"
       );
       setActiveRide(mine[0] ?? null);
 
@@ -182,6 +215,8 @@ export default function DriverDashboard() {
               />
             </View>
 
+            {locationNote ? <Text style={styles.locationNote}>{locationNote}</Text> : null}
+
             {/* Today's Stats */}
             <Text style={styles.sectionTitle}>Your Stats</Text>
             <View style={styles.statsGrid}>
@@ -236,23 +271,28 @@ export default function DriverDashboard() {
                   <View style={styles.requestTop}>
                     <View style={styles.requestCustomer}>
                       <View style={styles.custAvatar}>
-                        <Text style={styles.custAvatarText}>{ride.customer.name.charAt(0).toUpperCase()}</Text>
+                        <Ionicons name="navigate" size={16} color="#22c55e" />
                       </View>
                       <View>
-                        <Text style={styles.custName}>{ride.customer.name}</Text>
-                        <Text style={styles.vehicleTag}>{ride.vehicleType}</Text>
+                        <Text style={styles.custName}>
+                          {ride.pickupDistanceKm !== null ? `${ride.pickupDistanceKm} km away` : "Nearby"}
+                        </Text>
+                        <Text style={styles.vehicleTag}>
+                          {ride.vehicleType} · {Number(ride.distanceKm).toFixed(1)} km trip
+                        </Text>
                       </View>
                     </View>
-                    <Text style={styles.requestFare}>R{ride.fareEstimate}</Text>
+                    <Text style={styles.requestFare}>R{Number(ride.fareEstimate).toFixed(2)}</Text>
                   </View>
+                  {/* Suburbs only until the ride is accepted; the address comes with it. */}
                   <View style={styles.routeBlock}>
                     <View style={styles.routeRow}>
                       <View style={styles.dotGreen} />
-                      <Text style={styles.routeText} numberOfLines={1}>{ride.pickupAddress}</Text>
+                      <Text style={styles.routeText} numberOfLines={1}>{ride.pickupArea ?? "Pickup area not shown"}</Text>
                     </View>
                     <View style={styles.routeRow}>
                       <View style={styles.dotRed} />
-                      <Text style={styles.routeText} numberOfLines={1}>{ride.dropoffAddress}</Text>
+                      <Text style={styles.routeText} numberOfLines={1}>{ride.dropoffArea ?? "Drop-off area not shown"}</Text>
                     </View>
                   </View>
                   <TouchableOpacity style={styles.acceptBtn} onPress={() => acceptRide(ride.id)} activeOpacity={0.85}>
@@ -311,6 +351,7 @@ const styles = StyleSheet.create({
     borderColor: "#334155",
   },
   onlineCardActive: { borderColor: "#22c55e60", backgroundColor: "#22c55e08" },
+  locationNote: { color: "#fbbf24", fontSize: 13, lineHeight: 18, marginHorizontal: 20, marginTop: 10 },
   onlineLeft: { flexDirection: "row", alignItems: "center", gap: 12, flex: 1 },
   statusDot: {
     width: 12,

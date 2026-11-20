@@ -1,8 +1,9 @@
 import React, { useState, useEffect, useCallback } from "react";
 import {
   View, Text, StyleSheet, FlatList, TouchableOpacity,
-  SafeAreaView, RefreshControl, ActivityIndicator, ScrollView,
+  RefreshControl, ActivityIndicator, ScrollView,
 } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import { useAuth } from "@/context/AuthContext";
@@ -91,7 +92,13 @@ export default function OrdersScreen() {
     const extra = item.items.length > 2 ? ` +${item.items.length - 2} more` : "";
 
     return (
-      <TouchableOpacity style={styles.card} activeOpacity={0.8}>
+      <TouchableOpacity
+        style={styles.card}
+        activeOpacity={0.8}
+        // Cast like the other pushes in this app: expo-router's generated route
+        // types are a local, uncommitted file and go stale when a screen is added.
+        onPress={() => router.push(`/order/${item.id}` as never)}
+      >
         <View style={styles.cardTop}>
           <View style={styles.storeLogoBox}>
             <Text style={styles.storeLogoText}>{item.store.name.charAt(0).toUpperCase()}</Text>

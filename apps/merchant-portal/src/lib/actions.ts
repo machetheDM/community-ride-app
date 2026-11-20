@@ -4,12 +4,14 @@ import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { recordAuditStrict } from "@ride/db";
 import { canTransitionOrder, type OrderStatus } from "@ride/db/lifecycle";
+import { deliveryJobPush, pushTokensOfRidersNear } from "@ride/db/dispatch";
 import { issueOtp, maskPhone, normaliseSaMobile, smsTransportFromEnv, verifyOtp } from "@ride/db/otp";
 import { prisma } from "./prisma";
 import { endSession, sessionFor, startSession } from "./session";
 import { auditPortal, requestIp } from "./audit";
 import { isMerchantSettableOrderStatus } from "./access";
-import { sendPushToUser } from "./notifications";
+import { parseComplexForm } from "./complex-form";
+import { sendPushToMany, sendPushToUser } from "./notifications";
 
 /**
  * Every export here is a public HTTP endpoint: Next.js turns each into a POST
@@ -170,7 +172,15 @@ export async function updateOrderStatus(orderId: unknown, status: unknown): Prom
   // merchant id taken from the database, never from the request.
   const order = await prisma.order.findFirst({
     where: { id: orderId, store: { merchantId: session.merchantId } },
-    select: { id: true, status: true, customer: { select: { pushToken: true } } },
+    select: {
+      id: true,
+      status: true,
+      customerId: true,
+      deliveryFee: true,
+      customer: { select: { pushToken: true } },
+      store: { select: { name: true, lat: true, lng: true } },
+      delivery: { select: { id: true, status: true } },
+    },
   });
   if (!order) return { error: "Order not found" };
 
@@ -219,6 +229,21 @@ export async function updateOrderStatus(orderId: unknown, status: unknown): Prom
     await sendPushToUser(order.customer.pushToken, msg.title, msg.body, { orderId: order.id, screen: "orders" });
   }
 
+  // The store has said yes: tell the nearby riders who could take the job, the
+  // same push the API sends (packages/db/src/dispatch.ts). Store and fee only.
+  if (status === "CONFIRMED" && order.delivery?.status === "PENDING") {
+    try {
+      const tokens = await pushTokensOfRidersNear(prisma, order.store, { excludeUserId: order.customerId });
+      if (tokens.length > 0) {
+        const job = deliveryJobPush({ storeName: order.store.name, deliveryFee: order.deliveryFee });
+        await sendPushToMany(tokens, job.title, job.body, { deliveryId: order.delivery.id, screen: "deliveries" });
+      }
+    } catch (error) {
+      // The order is confirmed; a failed push must not tell the merchant otherwise.
+      console.warn("[portal] rider push failed", { orderId: order.id, error: error instanceof Error ? error.message : String(error) });
+    }
+  }
+
   revalidatePath("/dashboard/orders");
   revalidatePath("/dashboard");
   return { ok: true };
@@ -251,5 +276,95 @@ export async function toggleStoreOpen(storeId: unknown, isOpen: unknown): Promis
 
   revalidatePath("/dashboard/store");
   revalidatePath("/dashboard");
+  return { ok: true };
+}
+
+// ── Shopping complexes (admin) ──────────────────────────────────────────────
+
+export interface ComplexFormState {
+  ok?: boolean;
+  errors?: Record<string, string>;
+  error?: string;
+}
+
+/**
+ * Creates a shopping complex (docs/PLAN.md Phase 2.2). ADMIN only: a complex sets
+ * the delivery fee and the delivery zone for every store in it, so it is platform
+ * configuration, not a merchant's choice. Every field is parsed by
+ * parseComplexForm, because this is a public endpoint whatever the page shows.
+ */
+export async function createComplex(_prev: ComplexFormState, formData: FormData): Promise<ComplexFormState> {
+  const session = await sessionFor("admin");
+  if (!session) return { error: "Not authenticated" };
+
+  const parsed = parseComplexForm(Object.fromEntries(formData));
+  if (!parsed.ok) return { errors: parsed.errors };
+  const input = parsed.value;
+
+  const ip = await requestIp();
+  try {
+    await prisma.$transaction(async (tx) => {
+      const complex = await tx.complex.create({ data: input });
+      await recordAuditStrict(tx, {
+        actorUserId: session.userId,
+        actorRole: session.role,
+        action: "complex.create",
+        entityType: "Complex",
+        entityId: complex.id,
+        ip,
+        detail: {
+          channel: "portal",
+          slug: input.slug,
+          deliveryRadiusKm: input.deliveryRadiusKm,
+          deliveryFee: input.deliveryFee,
+        },
+      });
+    });
+  } catch (error) {
+    if ((error as { code?: string }).code === "P2002") {
+      return { errors: { name: "A complex with this name already exists" } };
+    }
+    throw error;
+  }
+
+  revalidatePath("/dashboard/complexes");
+  return { ok: true };
+}
+
+/**
+ * Puts a store in a complex, or takes it out (complexId null). ADMIN only, for the
+ * same reason: it changes what the store's customers pay for delivery and where
+ * it delivers. The before and after are audited.
+ */
+export async function setStoreComplex(storeId: unknown, complexId: unknown): Promise<ActionResult> {
+  const session = await sessionFor("admin");
+  if (!session) return { error: "Not authenticated" };
+  if (!isId(storeId)) return { error: "Store not found" };
+  if (complexId !== null && !isId(complexId)) return { error: "Complex not found" };
+
+  const ip = await requestIp();
+  const result = await prisma.$transaction(async (tx) => {
+    const store = await tx.store.findUnique({ where: { id: storeId }, select: { complexId: true } });
+    if (!store) return "Store not found";
+    if (complexId !== null) {
+      const exists = await tx.complex.count({ where: { id: complexId } });
+      if (exists === 0) return "Complex not found";
+    }
+    await tx.store.update({ where: { id: storeId }, data: { complexId } });
+    await recordAuditStrict(tx, {
+      actorUserId: session.userId,
+      actorRole: session.role,
+      action: "store.set_complex",
+      entityType: "Store",
+      entityId: storeId,
+      ip,
+      detail: { channel: "portal", from: store.complexId, to: complexId },
+    });
+    return null;
+  });
+  if (result) return { error: result };
+
+  revalidatePath("/dashboard/complexes");
+  revalidatePath("/dashboard/stores");
   return { ok: true };
 }

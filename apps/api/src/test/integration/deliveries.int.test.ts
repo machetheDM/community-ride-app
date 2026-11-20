@@ -9,12 +9,13 @@ import {
   createUser,
   prisma,
   request,
+  TEST_HANDOVER_CODE,
   type TestUser,
 } from "./helpers";
 
 /**
- * The rider's leg. Riders are assigned directly in these fixtures because
- * dispatch is Phase 2; what is under test is that only the assigned rider can
+ * The rider's leg. Riders are assigned directly in these fixtures (dispatch
+ * has its own suite, dispatch.int.test.ts); what is under test is that only the assigned rider can
  * move a delivery, one step at a time, with the order kept in step.
  */
 
@@ -41,11 +42,15 @@ describe("a delivery", () => {
     expect((await move(deliveryId, rider, { status: "PICKED_UP" })).status).toBe(200);
     expect((await prisma.order.findUniqueOrThrow({ where: { id: orderId } })).status).toBe("OUT_FOR_DELIVERY");
     expect((await move(deliveryId, rider, { status: "EN_ROUTE" })).status).toBe(200);
-    expect((await move(deliveryId, rider, { status: "DELIVERED" })).status).toBe(200);
+    expect((await move(deliveryId, rider, { status: "DELIVERED", handoverCode: TEST_HANDOVER_CODE })).status).toBe(200);
 
     const order = await prisma.order.findUniqueOrThrow({ where: { id: orderId } });
     expect(order.status).toBe("DELIVERED");
     expect(order.deliveredAt).not.toBeNull();
+    const owed = await prisma.ledgerEntry.findMany({ where: { sourceType: "DELIVERY", sourceId: deliveryId } });
+    expect(owed).toHaveLength(1);
+    expect(owed[0]).toMatchObject({ kind: "FEE_DUE", operatorUserId: rider.userId });
+    expect(owed[0].amount.toFixed(2)).toBe("1.50");
     const actions = [...(await auditRows(deliveryId)), ...(await auditRows(orderId))].map((a) => a.action);
     expect(actions).toEqual(
       expect.arrayContaining(["delivery.pick_up", "delivery.en_route", "delivery.deliver", "order.out_for_delivery", "order.delivered"])
@@ -56,7 +61,7 @@ describe("a delivery", () => {
     const rider = await createRider();
     const { deliveryId, orderId } = await readyOrderFor(rider.riderId);
 
-    const res = await move(deliveryId, rider, { status: "DELIVERED" });
+    const res = await move(deliveryId, rider, { status: "DELIVERED", handoverCode: TEST_HANDOVER_CODE });
 
     expect(res.status).toBe(409);
     expect((await prisma.order.findUniqueOrThrow({ where: { id: orderId } })).status).toBe("READY_FOR_PICKUP");

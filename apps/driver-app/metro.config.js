@@ -4,36 +4,34 @@ const path = require("path");
 /**
  * Metro configuration for this app inside the npm-workspaces monorepo.
  *
- * Without this file Metro only looks at the app directory, so it cannot resolve
- * `@ride/*` workspace packages at all — they live at the repo root and are
- * symlinked into node_modules. Type-checking would pass and the bundle would fail,
- * which is the worst order to find out.
+ * Since SDK 52, `expo/metro-config` detects the workspace itself: it watches the
+ * workspace packages and resolves hoisted dependencies from the root node_modules,
+ * and since SDK 53 it honours package `exports`, so subpath imports such as
+ * "@ride/maps-service/client" resolve. The manual `watchFolders`,
+ * `nodeModulesPaths` and `disableHierarchicalLookup` this file used to set are
+ * gone: `expo-doctor` flags them, and `disableHierarchicalLookup` stopped Metro
+ * finding dependencies npm nests inside another package (for example
+ * react-native's own @react-native/virtualized-lists), so the bundle failed.
  *
- * Three things are required:
- *   - watchFolders so Metro reads (and hot-reloads) source outside the app dir
- *   - nodeModulesPaths so it finds hoisted dependencies at the workspace root
- *   - package exports so subpath imports like "@ride/maps-service/client" resolve
+ * One override remains. The Next.js apps use a different React from this app, and
+ * npm may hoist either copy to the workspace root. Code outside this app (the
+ * hoisted react-native and expo-router, and @ride/maps-service/native) would then
+ * bind to the root copy while the app binds to its own, and two Reacts in one
+ * bundle break hooks with the "invalid hook call" error. So `react` and
+ * `react-dom` are always resolved as if imported from this app's directory.
  */
 const projectRoot = __dirname;
-const workspaceRoot = path.resolve(projectRoot, "../..");
 
 const config = getDefaultConfig(projectRoot);
 
-config.watchFolders = [workspaceRoot];
+const SINGLETONS = ["react", "react-dom"];
+const fromApp = path.join(projectRoot, "package.json");
+const upstreamResolveRequest = config.resolver.resolveRequest;
 
-config.resolver.nodeModulesPaths = [
-  path.resolve(projectRoot, "node_modules"),
-  path.resolve(workspaceRoot, "node_modules"),
-];
-
-// The maps package exposes "." , "./client" and "./native" as separate subpaths so
-// the React Native components never reach the API's bundle. Metro must honour the
-// exports map for those to resolve.
-config.resolver.unstable_enablePackageExports = true;
-
-// Prefer the app's own copy of React. The workspace root hoists React 19 for the
-// Next.js apps while Expo pins 18.3.1 — resolving two Reacts into one bundle breaks
-// hooks with the "invalid hook call" error.
-config.resolver.disableHierarchicalLookup = true;
+config.resolver.resolveRequest = (context, moduleName, platform) => {
+  const pinned = SINGLETONS.some((name) => moduleName === name || moduleName.startsWith(`${name}/`));
+  const ctx = pinned ? { ...context, originModulePath: fromApp } : context;
+  return (upstreamResolveRequest ?? context.resolveRequest)(ctx, moduleName, platform);
+};
 
 module.exports = config;

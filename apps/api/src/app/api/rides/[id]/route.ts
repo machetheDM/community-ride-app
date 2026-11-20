@@ -18,6 +18,9 @@ import { presentRide, rideSelect, type RideRecord } from "@/lib/views";
 import { sendPushToUser } from "@/lib/notifications";
 import { emitTripEvent } from "@/lib/analytics";
 import { logger } from "@/lib/logger";
+import { loadPricingPolicy } from "@/lib/fare";
+import { owedBy } from "@/lib/group-trips";
+import { feeOn, owedRefusal } from "@ride/db/trips";
 
 const RIDE_STATUS_MESSAGES: Record<string, { title: string; body: string }> = {
   ACCEPTED:       { title: "Driver found! 🚗", body: "A driver accepted your ride and is on the way." },
@@ -120,6 +123,9 @@ async function transition(
   const driverId = viewer.driverId ?? null;
   if (actor === "DRIVER" && !driverId) throw new ConcealedRecordError("Ride");
   const now = new Date();
+  // Our share of a completed ride, at the rate in force now, recorded as owed by
+  // the driver who collected the fare (PLAN.md 3.8; AGENTS.md non-negotiable 3).
+  const feePercent = to === "COMPLETED" ? (await loadPricingPolicy()).platformFeePercent : 0;
 
   const ride = await prisma.$transaction(async (tx) => {
     if (accepting && actor === "DRIVER" && driverId) {
@@ -139,6 +145,8 @@ async function transition(
         ? acceptRefusal(driver, otherActiveRides, viewer, current)
         : "Not a registered driver";
       if (refusal) throw new AuthorizationError(refusal);
+      const paused = owedRefusal(await owedBy(tx, viewer.userId));
+      if (paused) throw new AuthorizationError(paused);
     }
 
     const check = checkRideTransition(current.status, to, actor, { hasReason: Boolean(cancelReason) });
@@ -187,6 +195,12 @@ async function transition(
 
     if (to === "COMPLETED" && driverId) {
       await tx.driver.update({ where: { id: driverId }, data: { totalRides: { increment: 1 } } });
+      const fee = feeOn(Number(current.fareEstimate), feePercent);
+      if (fee > 0) {
+        await tx.ledgerEntry.create({
+          data: { operatorUserId: viewer.userId, kind: "FEE_DUE", amount: fee.toFixed(2), sourceType: "RIDE", sourceId: id },
+        });
+      }
     }
 
     await recordAuditStrict(tx, {

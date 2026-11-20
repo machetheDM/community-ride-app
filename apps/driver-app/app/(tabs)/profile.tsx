@@ -1,10 +1,13 @@
 import React from "react";
-import { View, Text, StyleSheet, TouchableOpacity, SafeAreaView, ScrollView, Alert } from "react-native";
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Alert } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { useAuth } from "@/context/AuthContext";
+import { useRouter } from "expo-router";
 
 export default function DriverProfileScreen() {
   const { user, signOut } = useAuth();
+  const router = useRouter();
 
   const confirmSignOut = () => {
     Alert.alert("Sign out?", "You'll need to verify your number again to sign back in.", [
@@ -15,7 +18,7 @@ export default function DriverProfileScreen() {
 
   const menuItems = [
     { icon: "car-outline", label: "My Vehicle", color: "#22c55e", onPress: () => {} },
-    { icon: "document-text-outline", label: "Documents", color: "#3b82f6", onPress: () => {} },
+    { icon: "document-text-outline", label: "Documents and fees", color: "#3b82f6", onPress: () => router.push("/operator" as never) },
     { icon: "notifications-outline", label: "Notifications", color: "#f97316", onPress: () => {} },
     { icon: "help-circle-outline", label: "Help & Support", color: "#6b7280", onPress: () => {} },
     { icon: "log-out-outline", label: "Sign Out", color: "#ef4444", onPress: confirmSignOut },

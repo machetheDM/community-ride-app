@@ -1,8 +1,9 @@
 import React, { useState, useEffect, useCallback, useRef } from "react";
 import {
-  View, Text, StyleSheet, TouchableOpacity, SafeAreaView,
+  View, Text, StyleSheet, TouchableOpacity,
   ActivityIndicator, Alert, Linking, ScrollView,
 } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { RouteMap } from "@ride/maps-service/native";
@@ -23,11 +24,15 @@ const STAGE_META: Record<string, { label: string; sub: string; icon: string }> =
 
 interface Vehicle { make: string; model: string; color: string; licensePlate: string }
 interface RideDriver {
-  user: { name: string; phone: string };
+  /** The phone is sent only while the trip is active. */
+  user: { name: string; phone?: string };
   vehicle: Vehicle | null;
-  /** Driver's last reported position, used to show them moving on the map. */
-  currentLat: number | null;
-  currentLng: number | null;
+  /**
+   * Where the driver is, sent only while the trip is active. The API stopped
+   * sending raw coordinates in November 2026, and this screen still read them, so
+   * the car never appeared on the map.
+   */
+  location?: { lat: number; lng: number } | null;
 }
 interface Ride {
   id: string;
@@ -61,13 +66,17 @@ export default function RideDetailScreen() {
 
   const fetchRide = useCallback(async () => {
     try {
-      const res = await fetch(`${API_URL}/api/rides/${id}`);
+      // With the token: since November 2026 a ride is readable only by its parties
+      // and an admin, and this read without one was answered with 401.
+      const res = await fetch(`${API_URL}/api/rides/${id}`, {
+        headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+      });
       const json = await res.json();
       if (json.success) setRide(json.data);
     } finally {
       setLoading(false);
     }
-  }, [id]);
+  }, [id, token]);
 
   useEffect(() => {
     fetchRide();
@@ -166,9 +175,7 @@ export default function RideDetailScreen() {
             dropoff={{ lat: ride.dropoffLat, lng: ride.dropoffLng }}
             polyline={polyline}
             driver={
-              ride.driver?.currentLat != null && ride.driver?.currentLng != null
-                ? { lat: ride.driver.currentLat, lng: ride.driver.currentLng }
-                : null
+              ride.driver?.location ?? null
             }
           />
         ) : null}

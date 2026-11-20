@@ -1,4 +1,5 @@
-import { View, Text, StyleSheet, FlatList, SafeAreaView } from "react-native";
+import { View, Text, StyleSheet, FlatList } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 
 export default function HistoryScreen() {
@@ -10,7 +11,7 @@ export default function HistoryScreen() {
       <FlatList
         data={[]}
         keyExtractor={(item) => String(item)}
-        renderItem={null}
+        renderItem={() => null}
         ListEmptyComponent={
           <View style={styles.empty}>
             <Ionicons name="time-outline" size={56} color="#334155" />

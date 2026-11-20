@@ -1,0 +1,192 @@
+import { describe, it, expect } from "@jest/globals";
+import {
+  counterRefusal,
+  departureFor,
+  eventFunnel,
+  feeOn,
+  fitsTrip,
+  missingDocuments,
+  newCheckInCode,
+  owedBalance,
+  owedRefusal,
+  priceRefusal,
+  seatPrice,
+  seatsOf,
+  tripTotals,
+  type PoolMember,
+} from "@ride/db/trips";
+
+describe("seat price", () => {
+  it("never goes below R20 a seat, however short the trip", () => {
+    expect(seatPrice(0).floor).toBe(20);
+    expect(seatPrice(2).floor).toBe(20);
+  });
+
+  it("rises with distance, in R5 steps, with a suggested range up to one and a half times the floor", () => {
+    const price = seatPrice(30); // 39 road km at R1.20 = R46.80, rounded up to R50
+    expect(price).toEqual({ floor: 50, suggestedLow: 50, suggestedHigh: 75 });
+  });
+
+  it("refuses an offer below the floor, which is the plan's check for 3.4", () => {
+    const price = seatPrice(30);
+    expect(priceRefusal(45, price)).toMatch(/least a seat on this trip can go for is R50/);
+    expect(priceRefusal(50, price)).toBeNull();
+    expect(priceRefusal(0, price)).toMatch(/Offer a price/);
+    expect(priceRefusal(Number.NaN, price)).toMatch(/Offer a price/);
+    expect(priceRefusal(251, price)).toMatch(/more than this trip needs/);
+  });
+});
+
+describe("pooling", () => {
+  const member = (id: string, seats: number, pricePerSeat = 50): PoolMember => ({ id, seats, pricePerSeat });
+
+  it("fits nine requests of one seat into one trip, the plan's check for 3.5", () => {
+    const members: PoolMember[] = [];
+    for (let i = 0; i < 9; i++) {
+      expect(fitsTrip(members, 1)).toBe(true);
+      members.push(member(`r${i}`, 1));
+    }
+    expect(tripTotals(members)).toEqual({ seats: 9, total: 450, lowestPerSeat: 50 });
+  });
+
+  it("never grows a trip past a minibus's fifteen seats", () => {
+    const members = [member("a", 6), member("b", 6)];
+    expect(fitsTrip(members, 3)).toBe(true);
+    expect(fitsTrip(members, 4)).toBe(false);
+  });
+
+  it("totals each passenger at their own price", () => {
+    expect(tripTotals([member("a", 2, 50), member("b", 1, 70)])).toEqual({ seats: 3, total: 170, lowestPerSeat: 50 });
+    expect(tripTotals([])).toEqual({ seats: 0, total: 0, lowestPerSeat: null });
+  });
+
+  it("leaves an hour before the event, and comes back at its end or four hours after the start", () => {
+    const startsAt = new Date("2026-12-05T18:00:00Z");
+    expect(departureFor({ startsAt, endsAt: null }, "TO_EVENT").toISOString()).toBe("2026-12-05T17:00:00.000Z");
+    expect(departureFor({ startsAt, endsAt: null }, "FROM_EVENT").toISOString()).toBe("2026-12-05T22:00:00.000Z");
+    const endsAt = new Date("2026-12-06T01:00:00Z");
+    expect(departureFor({ startsAt, endsAt }, "FROM_EVENT").toISOString()).toBe("2026-12-06T01:00:00.000Z");
+  });
+});
+
+describe("a counter-offer", () => {
+  const price = seatPrice(30);
+  const members: PoolMember[] = [
+    { id: "a", seats: 2, pricePerSeat: 50 },
+    { id: "b", seats: 1, pricePerSeat: 60 },
+  ];
+
+  it("must be above what the lowest passenger offered, or it is an acceptance", () => {
+    expect(counterRefusal(50, members, price)).toMatch(/accept the trip instead/);
+    expect(counterRefusal(55, members, price)).toBeNull();
+  });
+
+  it("cannot be more than twice the highest offer, or below the floor", () => {
+    expect(counterRefusal(121, members, price)).toMatch(/at most R120/);
+    expect(counterRefusal(40, members, price)).toMatch(/least a seat/);
+  });
+});
+
+describe("seats, codes and fees", () => {
+  it("count a vehicle's own seats, or its type's usual number", () => {
+    expect(seatsOf({ type: "MINIBUS", seats: null })).toBe(15);
+    expect(seatsOf({ type: "MINIBUS", seats: 14 })).toBe(14);
+    expect(seatsOf({ type: "SCOOTER", seats: null })).toBe(0);
+  });
+
+  it("make four-digit boarding codes from the whole range", () => {
+    const seen = new Set<string>();
+    for (let i = 0; i < 200; i++) {
+      const code = newCheckInCode();
+      expect(code).toMatch(/^\d{4}$/);
+      seen.add(code);
+    }
+    expect(seen.size).toBeGreaterThan(180);
+  });
+
+  it("take the fee to the cent", () => {
+    expect(feeOn(450, 15)).toBe(67.5);
+    expect(feeOn(99.99, 12)).toBe(12);
+  });
+});
+
+describe("the event funnel", () => {
+  it("says whether promoting the event paid, with ratios only where they mean something", () => {
+    const funnel = eventFunnel({
+      visits: [
+        { channel: "wa", count: 40 },
+        { channel: "fb", count: 160 },
+      ],
+      requests: [
+        { status: "COMPLETED", seats: 2 },
+        { status: "BOOKED", seats: 3 },
+        { status: "WAITING", seats: 1 },
+        { status: "CANCELLED", seats: 4 },
+      ],
+      fees: 67.5,
+      spend: 150,
+    });
+    expect(funnel).toMatchObject({
+      views: 200,
+      requests: 4,
+      seatsRequested: 10,
+      seatsBooked: 5,
+      requestsPerView: 0.02,
+      net: -82.5,
+      spendPerBookedSeat: 30,
+    });
+    expect(funnel.viewsByChannel[0]).toEqual({ channel: "fb", count: 160 });
+  });
+
+  it("gives null ratios, not zero, when nothing was seen or booked", () => {
+    const funnel = eventFunnel({ visits: [], requests: [], fees: 0, spend: 100 });
+    expect(funnel.requestsPerView).toBeNull();
+    expect(funnel.spendPerBookedSeat).toBeNull();
+    expect(funnel.net).toBe(-100);
+  });
+});
+
+describe("PLAN.md 3.8: what an operator owes", () => {
+  it("is fees due plus adjustments minus payments, to the cent, from Decimal-like values", () => {
+    const owed = owedBalance([
+      { kind: "FEE_DUE", amount: "10.10" },
+      { kind: "FEE_DUE", amount: { toString: () => "0.20" } },
+      { kind: "FEE_PAID", amount: "5.00" },
+      { kind: "ADJUSTMENT", amount: "-1.10" },
+    ]);
+    expect(owed).toBe(4.2);
+  });
+
+  it("pauses only above the limit, not at it", () => {
+    expect(owedRefusal(500)).toBeNull();
+    expect(owedRefusal(500.01)).toContain("R500.01");
+  });
+});
+
+describe("PLAN.md 3.7: operator documents", () => {
+  const now = new Date("2026-11-19T10:00:00Z");
+  const verified = (kind: string, expiresOn: Date | null = null) => ({ kind, status: "VERIFIED", expiresOn });
+
+  it("needs all four documents verified", () => {
+    expect(missingDocuments([], now)).toEqual(["DRIVING_PERMIT", "OPERATING_LICENCE", "VEHICLE_LICENCE", "INSURANCE"]);
+    expect(
+      missingDocuments(
+        [verified("DRIVING_PERMIT"), verified("OPERATING_LICENCE"), verified("VEHICLE_LICENCE"), verified("INSURANCE")],
+        now
+      )
+    ).toEqual([]);
+  });
+
+  it("counts a pending, rejected or expired document as missing", () => {
+    const missing = missingDocuments(
+      [
+        { kind: "DRIVING_PERMIT", status: "PENDING", expiresOn: null },
+        { kind: "OPERATING_LICENCE", status: "REJECTED", expiresOn: null },
+        verified("VEHICLE_LICENCE", new Date("2026-11-18T00:00:00Z")),
+        verified("INSURANCE", new Date("2027-01-01T00:00:00Z")),
+      ],
+      now
+    );
+    expect(missing).toEqual(["DRIVING_PERMIT", "OPERATING_LICENCE", "VEHICLE_LICENCE"]);
+  });
+});

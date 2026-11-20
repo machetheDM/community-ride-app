@@ -2,7 +2,7 @@ import { NextRequest } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { ok } from "@/lib/response";
 import { withErrorHandler } from "@/lib/handler";
-import { storeListSelect } from "@/lib/views";
+import { presentStore, storeListSelect } from "@/lib/views";
 
 /**
  * Public store list. Public on purpose, so a customer can browse before
@@ -38,5 +38,5 @@ export const GET = withErrorHandler(async (req: NextRequest) => {
     take: 50,
   });
 
-  return ok(stores);
+  return ok(stores.map(presentStore));
 });

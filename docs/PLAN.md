@@ -15,7 +15,9 @@ the threat model once Phase 1 had closed the holes in section 2.
 |---|---|---|
 | 0. A clean start | Done, 5 November 2026 | Pull request #6 |
 | 1. Close the security holes | Done, 5 November 2026: all eleven holes in section 2 closed, 48 of the threat model's rows DONE | The Phase 1 pull request; `docs/threat-model.md` names the commit for each |
-| 2 onwards | Not started | — |
+| 2. Delivery end to end | In progress. Server side done (12 November 2026): complexes (2.2), dispatch (2.3), handover code (2.5), tracking data (2.6), with the integration suite in CI (2.7); order integrity (2.4) was done in Phase 1. Rider and customer screens built; Expo SDK 58 (2.1) merged 19 November 2026, with type-check, `expo-doctor` and Android and iOS bundles passing. Left: 2.1's check that both apps start on a phone | The Phase 2 and 3 pull request |
+| 3. Events and group trips | In progress. Server and admin done (19 November 2026): venues, pickup points, events with posters, public event pages (3.1 to 3.3, ADR 0005, 0006); offers above a server floor, pooling, accept or counter, operator documents, the fee ledger with a pause limit, check-in codes and share links (3.4 to 3.9, ADR 0002 to 0004). Customer and operator screens for events and group trips built, and a share page for family (`/t/…`). Left: 3.9's check, "seen on a phone", and a report button (threat model PL-4) | The Phase 2 and 3 pull request |
+| 4 onwards | Not started | — |
 
 Section 2 below is the audit as it was found on 4 November, kept as the record of what Phase 1
 fixed.
@@ -255,7 +257,7 @@ Effort is an estimate in working days. A phase is finished when every check in i
 | # | Work | The check |
 |---|---|---|
 | 3.1 | Venue partners, with the agreement recorded | Admin can add one |
-| 3.2 | Events: poster upload, draft, review, publish; a public website (`apps/web`) with event pages whose share preview is the poster | A Facebook link preview shows the poster |
+| 3.2 | Events: poster upload, draft, review, publish; public event pages (served by the API app, ADR 0005) whose share preview is the poster | A Facebook link preview shows the poster |
 | 3.3 | Tracked links per channel; Meta spend recorded per event | Funnel query returns views by channel |
 | 3.4 | Trip offers: pickup point, seats, price per seat; floor and suggested range from the rate card | A test: an offer below the floor is refused |
 | 3.5 | Pooling rules into group offers | A test: nine requests become one offer |

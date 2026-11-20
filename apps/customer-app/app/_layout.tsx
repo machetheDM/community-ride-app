@@ -47,6 +47,33 @@ function AppStack() {
           headerTintColor: "#f8fafc",
         }}
       />
+      <Stack.Screen
+        name="order/[id]"
+        options={{
+          headerShown: true,
+          headerTitle: "Your order",
+          headerStyle: { backgroundColor: "#0f172a" },
+          headerTintColor: "#f8fafc",
+        }}
+      />
+      <Stack.Screen
+        name="event/[slug]"
+        options={{
+          headerShown: true,
+          headerTitle: "Event",
+          headerStyle: { backgroundColor: "#0f172a" },
+          headerTintColor: "#f8fafc",
+        }}
+      />
+      <Stack.Screen
+        name="trip/[id]"
+        options={{
+          headerShown: true,
+          headerTitle: "Your trip",
+          headerStyle: { backgroundColor: "#0f172a" },
+          headerTintColor: "#f8fafc",
+        }}
+      />
       <Stack.Screen name="ride/book" options={{ headerShown: false }} />
     </Stack>
   );

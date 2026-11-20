@@ -160,6 +160,13 @@ describe("hole 4: changing a ride's status", () => {
     const after = await prisma.ride.findUniqueOrThrow({ where: { id: ride.id } });
     expect(after.fareActual?.toFixed(2)).toBe("85.50");
     expect(after.completedAt).not.toBeNull();
+
+    // PLAN.md 3.8: our share is recorded as owed by the driver, once, at the
+    // fallback 10% (no pricing row in the throwaway database).
+    const owed = await prisma.ledgerEntry.findMany({ where: { sourceType: "RIDE", sourceId: ride.id } });
+    expect(owed).toHaveLength(1);
+    expect(owed[0]).toMatchObject({ kind: "FEE_DUE", operatorUserId: driver.userId });
+    expect(owed[0].amount.toFixed(2)).toBe("8.55");
   });
 
   it("refuses a skipped step: an accepted ride cannot jump to completed", async () => {

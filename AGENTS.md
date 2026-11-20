@@ -71,10 +71,11 @@ real personal data.
 
 | Component | Path | Local port | Notes |
 |---|---|---|---|
-| API | `apps/api` | 3000 | Next.js 16 route handlers. Request hook is `src/proxy.ts` (Next 16 renamed middleware) |
+| API | `apps/api` | 3000 | Next.js 16 route handlers. Request hook is `src/proxy.ts` (Next 16 renamed middleware), `/api` only |
+| Public event pages | `apps/api/src/app/e` | 3000 | Server-rendered, headers in `apps/api/next.config.ts` (ADR 0005) |
 | Merchant and admin portal | `apps/merchant-portal` | 3001 | Next.js 16, server actions |
-| Customer app | `apps/customer-app` | — | Expo SDK 52 (upgrade is Phase 2.1) |
-| Operator app | `apps/driver-app` | — | Drivers and scooter riders |
+| Customer app | `apps/customer-app` | — | Expo SDK 58, React Native 0.88, React 19.3.0 (exact) |
+| Operator app | `apps/driver-app` | — | Drivers and scooter riders; same SDK |
 | Database | `packages/db` | — | Prisma 7, Postgres schema `ride`, migrations in `prisma/migrations` |
 | Shared crypto and audit | `packages/db/src/{crypto,audit}.ts` | — | `@ride/db/crypto`, `recordAudit` |
 | Maps | `packages/maps-service` | — | Google Routes and Places (New), server key only |
@@ -104,6 +105,11 @@ real personal data.
   fingerprint in `.gitleaksignore`.
 - **Git:** Conventional Commits; cite the PRACTICES rule ID a change follows; every change
   reaches `main` through a pull request whose checks ran (DSO-1).
+- **Group-trip concurrency:** any change to which requests sit in an OPEN trip takes the pool's
+  advisory lock (`lockPool`), then the operator's row lock; trip status changes are conditional
+  writes. Keep that order, or two locks can deadlock.
+- **Inside an interactive transaction, query one at a time.** `Promise.all` over `tx` overlaps
+  queries on one pg connection (pg warns, and v9 will refuse).
 - Next.js 16 differs from older versions: read `node_modules/next/dist/docs/` before using
   an unfamiliar API.
 
@@ -118,6 +124,7 @@ real personal data.
 - Docker Desktop is not always running; start it before the database tests.
 - Gitleaks 8.30's `[[allowlists]]` did not match as documented; `.gitleaksignore`
   fingerprints did.
+- `PRACTICES.md` has no TST rule: cite only IDs that exist (ALL, ML, DSO, DS, SEC, ARC).
 - Jest finds no tests in a checkout whose path contains a dot folder (the agent worktrees
   under `.claude/worktrees/`): on Windows the backslash before `.claude` is read as a glob
   escape in `testMatch`. Run there with `-- "--testMatch=**/src/test/unit/**/*.test.ts"`.
@@ -138,11 +145,16 @@ node scripts/audit-gate.mjs
 
 Terraform: `terraform -chdir=infra/gcp fmt -check; terraform -chdir=infra/gcp validate`.
 
-## State (5 November 2026)
+## State (19 November 2026)
 
-- Phase 0 (clean start) and Phase 1 (close the security holes) of `docs/PLAN.md` done:
-  every hole in the plan's section 2 closed, 48 threat-model rows DONE. Next is Phase 2
-  (delivery end to end, starting with the Expo SDK upgrade).
+- Phases 0 and 1 of `docs/PLAN.md` done. Phase 2 done in code: server side, screens, and
+  the Expo SDK 58 upgrade (2.1, merged into `feat/phase-2-delivery`). Neither app has run on
+  a phone yet; the icon and splash artwork were never in the repo.
+- Phase 3 built: public event pages (`apps/api/src/app/e`), offers, pooling, accept and
+  counter, operator documents, the fee ledger and pause limit, check-in, share links
+  (`apps/api/src/app/t`), and the event and group-trip screens in both apps. Left: seeing it
+  on a phone, and a report button (threat model PL-4).
+- Decisions are in `docs/adr/` (0001 to 0007). Threat model: 68 rows DONE, 6 OPEN, 9 PLANNED.
 - Tests: unit (`npx turbo test`) and integration against Postgres
   (`npm run test:integration -w @ride/api`, needs `TEST_DATABASE_URL` on localhost).
 - Nothing deployed. No GCP project. No real users or data.

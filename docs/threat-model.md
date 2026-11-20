@@ -2,10 +2,11 @@
 
 **Date:** 4 November 2026 · **Commit audited:** `4fe55a7` (`main`) · **Owner:** the repository owner (`machetheDM`)
 
-**Status, updated 5 November 2026 after Phase 1:** 48 rows DONE, 5 OPEN (AU-4, RD-13 and IN-4
-reduced but not closed; PU-2; IN-11, low), 19 PLANNED (all for features of Phases 2 to 4 that are
-not built yet). Each DONE row cites the commit that closed it. Line numbers in the Evidence column
-still refer to `4fe55a7`, where the hole was found.
+**Status, updated 19 November 2026 for Phase 3 (events and group trips):** 68 rows DONE, 6 OPEN
+(AU-4, RD-13, IN-4 and PL-4 reduced but not closed; PU-2; IN-11, low),
+9 PLANNED (PL-10 and the poster reader of Phase 4). Rows GT-1, GT-2 and EV-1 are new. Each DONE
+row cites the commit that closed it. Line numbers in the Evidence column still refer to
+`4fe55a7`, where the hole was found.
 
 **Rules:** written for ALL-2. Every claim carries a state and a file (ALL-1). SEC-3, SEC-4, SEC-7 and
 ML-5 are applied where cited. All four are still drafts in `../PRACTICES.md`.
@@ -177,6 +178,7 @@ consumption). "Hole n" is the row in PLAN.md §2. Paths under `app/api/` are in 
 | RD-11 | Rides | R | An operator denies accepting, a customer denies cancelling, and nothing records who did what | — | Only timestamps (`rides/[id]/route.ts:63-65`) | Audit table for every transition and admin action (SEC-4) | DONE (`d086691`): every move audited in its transaction |
 | RD-12 | Maps | D | An open proxy in front of billed Google APIs | API4 | Server-only key, separate from the app's render key (`apps/api/src/lib/maps.ts:9`, `:34`; `apps/customer-app/app.config.js:7-16`); proxy routes need a token and a per-route limit (`app/api/maps/geocode/route.ts:19-21`; `rate-limit.ts:89-90`) | — | DONE |
 | RD-13 | Maps | D | One account can still run up the Maps bill: limits key on the spoofable header; booking geocodes and routes with no Maps limiter; location updates call routes (RD-8); no quota on the server key in Terraform; the budget only alerts | API4 | `rate-limit.ts:42-45`; `rides/route.ts:61`, `:77-84`; `infra/gcp/main.tf:93-120` | Key signed-in limits on `userId`; per-user daily Maps cap; API quota on the server key | OPEN, reduced: limits key on the trusted address (`459c76e`); booking still has no Maps limiter |
+| RD-14 | Rides | I | A customer books a ride to watch where an operator is. Phase 1 hid operators' positions from everyone but an admin, which also took the car off the customer's own tracking map; Phase 2 gives it back to the ride's customer | API3 | `presentRide` in `apps/api/src/lib/views.ts`; `drivers.int.test.ts` | The position goes only to the ride's own customer, only while the trip is active (accepted to in progress), never before a driver accepts or after the trip ends, and to no other customer. Residual: a customer with an accepted ride sees the car approach, which is what ride-hailing is; the booking is tied to a verified phone and audited | DONE (Phase 2), residual accepted |
 
 ### 5.3 Orders and delivery
 
@@ -188,6 +190,18 @@ consumption). "Hole n" is the row in PLAN.md §2. Paths under `app/api/` are in 
 | OD-4 | Orders | T, R | A dishonest merchant marks its own order delivered, or sets any status, with no rider and no customer | API6 | `apps/merchant-portal/src/lib/actions.ts:53-61` (status not validated) | Merchant may confirm, prepare, mark ready or cancel; "delivered" needs the assigned rider and the customer's handover code | DONE (`23fdce0`, `79dfc9e`): neither the API nor the portal lets a store set DELIVERED |
 | OD-5 | Delivery | E | Someone other than the assigned rider advances a delivery | API1 | Assigned-rider check (`app/api/deliveries/[id]/status/route.ts:68-76`); status parsed by schema (`:54`). Transitions are not ordered yet (1.3), and no rider is ever assigned (2.3) | — | DONE |
 | OD-6 | Orders | I | A merchant sees another merchant's orders | API1 | Queries scoped to `session.merchantId` (`actions.ts:46-51`, `:78-79`; `apps/merchant-portal/src/app/dashboard/orders/page.tsx:31-33`). Only as strong as the cookie (PA-2) | — | DONE |
+
+### 5.3a Dispatch and handover (Phase 2, added 12 November 2026)
+
+| ID | Flow | STRIDE | Threat | API | Evidence | Mitigation | State |
+|---|---|---|---|---|---|---|---|
+| DL-1 | Handover | S, T | A rider guesses the customer's 4-digit code at the door, or scripts guesses | API2, API6 | `apps/api/src/lib/delivery.ts` (`checkHandoverCode`); `app/api/deliveries/[id]/status/route.ts` (`checkHandover`) | Five wrong codes lock the delivery for support, checked before the code so the right code after the limit still fails; each counted by a conditional write and audited | DONE (`132f6d2`) |
+| DL-2 | Handover | I | The rider's app, the store or an admin reads the code and the handover proves nothing | API3 | `presentOrder` in `apps/api/src/lib/views.ts` | Encrypted at rest; decrypted only into the customer's view and only until the delivery ends; unit tests search every other view for it | DONE (`132f6d2`) |
+| DL-3 | Dispatch | I | A rider (or an account posing as one) harvests customers' addresses from the waiting-delivery list | API3 | `app/api/deliveries/available/route.ts`; `presentAvailableDelivery` | Approved, online riders with an approved vehicle only; a suburb and a distance rounded to 0.5 km; name, phone and address only after accepting, and the phone only while the job is active | DONE (`132f6d2`) |
+| DL-4 | Dispatch | T | Two riders take one job, or one rider hoards several | API6 | `app/api/deliveries/[id]/accept/route.ts` | Rider row locked; one conditional write on waiting-with-no-rider; one active delivery per rider; not your own order | DONE (`132f6d2`) |
+| DL-5 | Tracking | I | A customer follows the rider before pickup or after the job, or learns where an off-duty rider lives | API3 | `presentOrder`; `app/api/riders/me/route.ts` | Position shown only between pickup and handover; stored only while online and approved; going offline clears it; no position history kept | DONE (`132f6d2`) |
+| DL-6 | Complexes | T, R | An admin quietly changes what a complex's customers pay, or moves a store between complexes | API5 | `apps/merchant-portal/src/lib/actions.ts` (`createComplex`, `setStoreComplex`) | ADMIN only; validated on the server; audited in the same transaction with the before and after | DONE (`a31e3c7`) |
+| DL-7 | Dispatch | D | Riders are not told about new jobs and orders go cold, because the list is polled | API6 | `packages/db/src/dispatch.ts`; the order status route and the portal action | A push to nearby riders who could take the job when a store confirms an order: store and fee only, riders who are offline, far or busy left out | DONE (`417401c`) |
 
 ### 5.4 Portal and admin
 
@@ -235,23 +249,27 @@ consumption). "Hole n" is the row in PLAN.md §2. Paths under `app/api/` are in 
 | IN-12 | API | D | The limiter's store is not really bounded: the sweep drops only expired keys, so spoofed fresh keys grow it for the whole window | API4 | `rate-limit.ts:24-30`, `:54-55` | Evict the oldest when full; the trusted address from 1.5 shrinks the key space | DONE (`459c76e`) |
 | IN-13 | API | — | Inventory drift: three false README claims; schemas no route uses look like validation that is happening; the `/admin` menu links to eight pages that do not exist | API9 | `validate.ts:129-133`, `:154-157`, `:179-184`; `apps/api/src/app/admin/layout.tsx:16-26`; PLAN.md §2 | Correct the README; wire or delete each schema; an endpoint list in the architecture documents (5.1) | DONE (`bfaa9c9`, `994f9ee`, `00810b2`) |
 
-### 5.8 Planned: dispatch, events, offers, promotion (Phases 2 and 3)
+### 5.8 Events, offers, group trips and promotion (Phase 3, built 19 November 2026)
 
-None of this exists. Evidence is "not built" unless a field already exists.
+Written on 4 November before any of it existed; the Evidence and State columns were updated as
+each row was built.
 
 | ID | Flow | STRIDE | Threat | API | Evidence | Mitigation | State |
 |---|---|---|---|---|---|---|---|
-| PL-1 | Offers | T | Lowball offers below cost, sent straight to the API around the app's floor | API6 | Not built (PLAN.md §4, 1b step 4) | Floor enforced on the server from the rate card | PLANNED 3.4 |
-| PL-2 | Offers | T | Two operators secure one group trip, or counters go back and forth for ever | API6 | Not built | One conditional update; one counter; passengers confirm it | PLANNED 3.6 |
-| PL-3 | Offers | D | A competitor books seats it will not use: an operator drives to an empty pickup, or a real trip looks full | API6 | Not built | Phone-verified accounts; a seat cap per account per event; check-in code; no-show count | PLANNED 3.5, 3.9 |
-| PL-4 | Offers | I | **A hostile actor joins a group trip to learn which operator drives, their plate, the pickup point and the time** | API3, API6 | Not built; PLAN.md §4 1b step 7 shows operator, vehicle and plate | Operator and plate to confirmed passengers only, close to departure; pickups at published public points; a report button; a cap on trips joined per account | PLANNED 3.6, 3.9 |
-| PL-5 | Trips | I | A "share my trip" link keeps showing live location after the trip, or to whoever it is forwarded to | API1 | Not built | Unguessable token; expires at completion; shows no ID, licence or phone | PLANNED 3.9 |
-| PL-6 | Ledger | T, R | An operator fakes a completion or settles off the platform to avoid the fee; an insider edits what an operator owes | API6 | `platformFeePercent` exists (`schema.prisma:472`); nothing records fees | Fees as append-only events; balances derived; check-in code; pause above a limit; audit | PLANNED 3.8, 3.9, 1.7 |
-| PL-7 | Operators | E | An unverified operator sees offers, or an operator approves themselves | API5 | `isApproved` exists (`schema.prisma:128`); no route sets it | An admin verifies documents; nothing approves itself | PLANNED 3.7 |
-| PL-8 | Events | T, I | A poster upload is oversized or malformed, or its metadata carries the sender's location; a public bucket lists drafts | API4, API8 | Not built | Size and type caps; re-encode; strip metadata; private bucket with signed reads until published | PLANNED 3.2 |
-| PL-9 | Events | I | Importing a poster "from a link" makes the server fetch internal addresses, such as the metadata server | API7 | Not built | Upload only. If link import is ever added: allow-list, and block private ranges and the metadata host | PLANNED 3.2 |
+| PL-1 | Offers | T | Lowball offers below cost, sent straight to the API around the app's floor | API6 | `seatPrice`/`priceRefusal` (`packages/db/src/trips.ts`); the request route prices the floor from the pickup point and venue | Floor enforced on the server from the rate card | DONE (`6cb1895`): `group-trips.int.test.ts` "refuses an offer below the floor and stores nothing" |
+| PL-2 | Offers | T | Two operators secure one group trip, or counters go back and forth for ever | API6 | `bookTrip` writes conditional on OPEN under the pool's advisory lock (`apps/api/src/lib/group-trips.ts`) | One conditional update; one counter per trip and per operator; passengers confirm it; it lapses after 30 minutes | DONE (`6cb1895`): "gives exactly one of two operators accepting at once the trip", the counter and lapse tests |
+| PL-3 | Offers | D | A competitor books seats it will not use: an operator drives to an empty pickup, or a real trip looks full | API6 | Unique request per passenger, event and direction; at most 6 seats; check-in code; no-shows recorded at completion | Phone-verified accounts; a seat cap per account per event; check-in code; no-show count | DONE (`6cb1895`); a no-show count per account that limits future requests is PLANNED with the pilot data (Phase 6) |
+| PL-4 | Offers | I | **A hostile actor joins a group trip to learn which operator drives, their plate, the pickup point and the time** | API3, API6 | Operator and plate appear to BOOKED passengers only (`presentMyRequest`); pickups are admin-made public points; one request per account per event and direction | Operator and plate to confirmed passengers only, close to departure; pickups at published public points; a report button; a cap on trips joined per account | OPEN, reduced (`6cb1895`): shown from booking, not only close to departure; no report button yet (Phase 3.9 screens) |
+| PL-5 | Trips | I | A "share my trip" link keeps showing live location after the trip, or to whoever it is forwarded to | API1 | `GET /api/trips/share/{token}`: 160-bit token stored as a keyed hash; trip and vehicle only | Unguessable token; expires at completion; shows no ID, licence or phone | DONE (`6cb1895`): works until 12 hours after completion; no position is ever shown; tested in `group-trips.int.test.ts` |
+| PL-6 | Ledger | T, R | An operator fakes a completion or settles off the platform to avoid the fee; an insider edits what an operator owes | API6 | `LedgerEntry` FEE_DUE on ride, delivery and group-trip completion, unique per source; balance derived by `owedBalance`; payments and adjustments audited | Fees as append-only events; balances derived; check-in code; pause above a limit; audit | DONE (`6cb1895`, ADR 0003): "boards by code, completes after departure, and records the fee once"; "pauses an operator who owes more than the limit" |
+| PL-7 | Operators | E | An unverified operator sees offers, or an operator approves themselves | API5 | `operatorStanding` reads approval, four VERIFIED documents and the vehicle from the database; the portal refuses an admin reviewing their own document | An admin verifies documents; nothing approves itself | DONE (`6cb1895`): "shows an operator whose documents are not verified no trips, and refuses their accept" |
+| PL-8 | Events | T, I | A poster upload is oversized or malformed, or its metadata carries the sender's location; a public bucket lists drafts | API4, API8 | `sanitizePoster` (`packages/db/src/poster.ts`): 2 MB cap, JPEG and PNG only, metadata dropped; stored in Postgres; served only for PUBLISHED events | Size and type caps; re-encode; strip metadata; private storage until published | DONE (`74d0926`, `04475f3`, ADR 0006): `poster.test.ts`; `events.int.test.ts` "answers a draft's slug with 404" |
+| PL-9 | Events | I | Importing a poster "from a link" makes the server fetch internal addresses, such as the metadata server | API7 | Posters are uploaded by an admin; no code fetches a URL for a poster | Upload only. If link import is ever added: allow-list, and block private ranges and the metadata host | DONE (`74d0926`): by absence; the rule stands for any later link import |
 | PL-10 | Promotion | I | The Meta page token leaks; a pixel or custom audience shares customers' data without consent | API10 | Not built | Manual posting first; token in Secret Manager when the Graph API is used; no pixel or audience without marketing consent | PLANNED 3.3, 6.1 |
-| PL-11 | Delivery | T | A rider claims "delivered" without the customer; two riders take one order | API6 | Not built; no route writes `Delivery.riderId` | Atomic assignment; 4-digit handover code | PLANNED 2.3, 2.5 |
+| PL-11 | Delivery | T | A rider claims "delivered" without the customer; two riders take one order | API6 | Not built; no route writes `Delivery.riderId` | Atomic assignment; 4-digit handover code | DONE (`132f6d2`): see DL-1 and DL-4 |
+| GT-1 | Group trips | S | An operator, or someone with their phone, guesses boarding codes to mark absent passengers boarded | API6 | 4-digit code per passenger, unique on the trip, checked in constant time; only the trip's operator may check in | Wrong codes are audited outside the transaction and check-in locks after 20 on a trip | DONE (`6cb1895`) |
+| GT-2 | Group trips | D | One operator counters every open trip to freeze the board | API6 | `counter/route.ts` counts the operator's live counters under their row lock | One held counter per operator; counters lapse after 30 minutes | DONE (`6cb1895`) |
+| EV-1 | Events | T | Every share inflates the funnel because Facebook's and WhatsApp's preview crawlers fetch the page | — | `countVisit` skips known crawlers and requests with no user agent | Count people, not previews; the funnel says views, not people | DONE (`04475f3`) |
 
 ## 6. The poster reader (Phase 4)
 
