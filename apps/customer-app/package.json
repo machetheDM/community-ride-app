@@ -36,7 +36,7 @@
     "react-native-worklets": "0.13.0"
   },
   "devDependencies": {
-    "@babel/core": "^7.25.0",
+    "@babel/core": "^8.1.2",
     "@types/react": "~19.3.0",
     "typescript": "~6.0.3"
   }
