@@ -111,10 +111,12 @@ and refuses to save a model that fails to beat the Google Maps baseline.
   shared store; this is stated rather than implied.
 - **Known advisories, gated** — CI fails on any high or critical advisory unless
   [`security/audit-exceptions.json`](security/audit-exceptions.json) accepts it
-  with a reason and an expiry date (`scripts/audit-gate.mjs`). None is accepted
-  today: the six Expo SDK 52 build-tooling advisories listed there before cleared
-  with the SDK 58 upgrade (19 November 2026). Moderate advisories are reported,
-  not gated.
+  with a reason and an expiry date (`scripts/audit-gate.mjs`). One advisory is
+  accepted today, flagged on three packages: a ReDoS in `effect` that Prisma's
+  command-line tool pins, which is not in the API image and reads only our own
+  config. It expires on 20 December 2026. The six Expo SDK 52 build-tooling
+  advisories listed there before cleared with the SDK 58 upgrade (19 November 2026).
+  Moderate advisories are reported, not gated.
 
 ### Google Maps Platform
 
