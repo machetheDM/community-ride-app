@@ -10,8 +10,21 @@ import { Badge } from "@/components/ui/Badge";
 import { ActionForm } from "@/components/ActionForm";
 import { recordSpend, uploadPoster } from "@/lib/event-actions";
 import { SPEND_CHANNELS } from "@/lib/event-forms";
+import { readerConfig } from "@ride/poster-reader";
+import { readingRefusal, storedProposal, storedSetAside } from "@/lib/poster-reading";
+import { countReadsToday } from "@/lib/poster-reads";
 import { EventStatusButtons } from "./EventStatusButtons";
+import { PosterReading, type ReadingView } from "./PosterReading";
 import { sast } from "../page";
+
+const FIELD_LABELS = [
+  ["title", "Title"],
+  ["startsAt", "Starts"],
+  ["endsAt", "Ends"],
+  ["venueName", "Venue"],
+  ["ticketInfo", "Tickets"],
+  ["description", "Description"],
+] as const;
 
 export const dynamic = "force-dynamic";
 
@@ -62,6 +75,65 @@ export default async function EventPage({ params }: { params: Promise<{ id: stri
     fees: Number(fees._sum.amount ?? 0),
     spend: event.spends.reduce((sum, s) => sum + Number(s.amount), 0),
   });
+
+  // The poster reader (Phase 4): the latest reading, and whether another is offered.
+  const [latest, readsToday] = await Promise.all([
+    prisma.modelCall.findFirst({
+      where: { eventId: id, feature: "poster.read" },
+      orderBy: { createdAt: "desc" },
+      select: {
+        id: true,
+        outcome: true,
+        model: true,
+        promptVersion: true,
+        latencyMs: true,
+        inputTokens: true,
+        outputTokens: true,
+        costUsd: true,
+        problem: true,
+        proposal: true,
+        setAside: true,
+        posterSha256: true,
+        appliedAt: true,
+        createdAt: true,
+      },
+    }),
+    countReadsToday(id),
+  ]);
+  const refusal = readingRefusal(readerConfig(), event, readsToday);
+  const current: Record<string, string> = {
+    title: event.title,
+    startsAt: sast(event.startsAt),
+    endsAt: event.endsAt ? sast(event.endsAt) : "",
+    venueName: event.venue.name,
+    ticketInfo: event.ticketInfo ?? "",
+    description: event.description ?? "",
+  };
+  const proposal = latest ? storedProposal(latest.proposal) : {};
+  const reading: ReadingView | null = latest
+    ? {
+        id: latest.id,
+        outcome: latest.outcome,
+        model: latest.model,
+        promptVersion: latest.promptVersion,
+        latencyMs: latest.latencyMs,
+        inputTokens: latest.inputTokens,
+        outputTokens: latest.outputTokens,
+        costUsd: latest.costUsd === null ? null : latest.costUsd.toString(),
+        problem: latest.problem,
+        stale: latest.posterSha256 !== event.posterSha256,
+        applied: latest.appliedAt !== null,
+        createdAt: sast(latest.createdAt),
+        rows: FIELD_LABELS.map(([field, label]) => ({
+          field,
+          label,
+          current: current[field],
+          proposed: proposal[field] ?? null,
+          applicable: field !== "venueName",
+        })),
+        setAside: storedSetAside(latest.setAside),
+      }
+    : null;
 
   const pageUrl = `${PUBLIC_BASE}/e/${event.slug}`;
   const shareLinks = [
@@ -140,6 +212,15 @@ export default async function EventPage({ params }: { params: Promise<{ id: stri
           )}
         </Card>
       </div>
+
+      <Card>
+        <h2 className="text-sm font-semibold text-slate-100 mb-1">Read the details off the poster</h2>
+        <p className="text-xs text-slate-500 mb-4">
+          A language model (Gemini on Vertex AI) proposes the details; you check them against the poster and apply what
+          is right. It never publishes.
+        </p>
+        <PosterReading key={reading?.id ?? "none"} eventId={event.id} isDraft={event.status === "DRAFT"} refusal={refusal} reading={reading} />
+      </Card>
 
       <Card>
         <h2 className="text-sm font-semibold text-slate-100 mb-4">Did promoting it pay?</h2>

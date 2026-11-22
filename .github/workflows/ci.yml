@@ -55,6 +55,12 @@ jobs:
         run: npx turbo test
         env:
           NODE_ENV: test
+      # The poster reader's red-team set and false-alarm check (docs/PLAN.md 4.6,
+      # PRACTICES ML-5). No model is called: hand-written compromised answers test
+      # the defences, and recorded live answers, once there are any, score the
+      # model. The results land in the job summary; a defence that misses fails it.
+      - name: Poster reader evaluation
+        run: npm run eval -w @ride/poster-reader
 
   integration:
     name: Integration Tests (Postgres)

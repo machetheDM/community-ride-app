@@ -64,6 +64,9 @@ real personal data.
   was sent.
 - No model is trained below its data threshold (`scripts/train_eta_model.py` refuses under
   200 trips).
+- The poster reader's schema has no status, price or action field, and a reading never
+  publishes an event or sets its venue (ADR 0008). Do not add one. Its accuracy is never claimed
+  without answers recorded from a live run; until then the evaluation says it is not measured.
 
 ---
 
@@ -81,6 +84,7 @@ real personal data.
 | Maps | `packages/maps-service` | — | Google Routes and Places (New), server key only |
 | Push | `packages/push-service` | — | Expo and FCM |
 | Analytics | `packages/analytics` | — | BigQuery, pseudonymised; no-op when unconfigured |
+| Poster reader | `packages/poster-reader` | — | Gemini on Vertex AI, CONFIGURED (no GCP project); off unless `POSTER_READER_*` are set (ADR 0008). Evaluation in `eval/`, model card beside it |
 | Infrastructure | `infra/gcp` | — | Terraform, **never applied** |
 | ML | `scripts/train_eta_model.py` | — | Waits for 200 trips |
 
@@ -110,6 +114,9 @@ real personal data.
   writes. Keep that order, or two locks can deadlock.
 - **Inside an interactive transaction, query one at a time.** `Promise.all` over `tx` overlaps
   queries on one pg connection (pg warns, and v9 will refuse).
+- **The poster reader's prompt and schema carry a version** (`PROMPT_VERSION`,
+  `packages/poster-reader/src/fields.ts`). Change either and bump it: answers recorded for the
+  old version stop counting, and accuracy needs a new live run.
 - Next.js 16 differs from older versions: read `node_modules/next/dist/docs/` before using
   an unfamiliar API.
 
@@ -135,12 +142,16 @@ real personal data.
   `next-env.d.ts`. Run in parallel, the type-check failed on half-written route types
   (seen after `/admin` was removed). `turbo.json` makes each package's `build` wait for
   its own `typecheck`.
+- `python -I` hides the user site-packages, where Pillow is installed on the owner's machine.
+  `packages/poster-reader/eval/make_posters.py` reads only the repository's own files, so it
+  runs with plain `python`.
 
 ## Verification
 
 ```powershell
 npx turbo typecheck lint test build
 node scripts/audit-gate.mjs
+npm run eval -w @ride/poster-reader
 ```
 
 Terraform: `terraform -chdir=infra/gcp fmt -check; terraform -chdir=infra/gcp validate`.
@@ -154,7 +165,12 @@ Terraform: `terraform -chdir=infra/gcp fmt -check; terraform -chdir=infra/gcp va
   counter, operator documents, the fee ledger and pause limit, check-in, share links
   (`apps/api/src/app/t`), and the event and group-trip screens in both apps. Left: seeing it
   on a phone, and a report button (threat model PL-4).
-- Decisions are in `docs/adr/` (0001 to 0007). Threat model: 68 rows DONE, 6 OPEN, 9 PLANNED.
+- Phase 4 started on `feat/phase-4-poster-reader`: the poster reader (4.3), its switch (4.4),
+  per-call records and a day's cost (4.5), the synthetic and red-team set (4.1) with its
+  evaluation in CI (4.6), the model card and NIST AI 600-1 table (4.8, in part). Not measured:
+  the model's accuracy and cost (needs a GCP project) and the manual baseline (4.2, needs a
+  person). Left: the Facebook post draft (4.7), the AICM and SP 800-218A tables.
+- Decisions are in `docs/adr/` (0001 to 0008). Threat model: 73 rows DONE, 8 OPEN, 2 PLANNED.
 - Tests: unit (`npx turbo test`) and integration against Postgres
   (`npm run test:integration -w @ride/api`, needs `TEST_DATABASE_URL` on localhost).
 - Nothing deployed. No GCP project. No real users or data.
