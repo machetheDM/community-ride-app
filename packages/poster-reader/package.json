@@ -12,7 +12,7 @@
     "cost": "tsx scripts/day-cost.ts"
   },
   "dependencies": {
-    "@opentelemetry/api": "^1.9.1",
+    "@opentelemetry/api": "^1.10.0",
     "google-auth-library": "^10.9.1",
     "zod": "^4.4.3"
   },
